@@ -5,13 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>올영세일 분할결제 쿠폰 계산기</title>
 
-<!-- PWA 메타 태그 및 매니페스트 연결 -->
+<!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#3F6B33">
+<meta name="theme-color" content="#24421C">
+<meta name="description" content="올영세일 첫날 쿠폰팩과 멤버십 쿠폰을 최대한 활용해 분할결제 할인을 계산해주는 도구">
+
+<!-- iOS home-screen support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="올영계산기">
-<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="올영쿠폰계산기">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 
 <style>
   :root{
@@ -204,6 +209,10 @@
   .receipt-head{text-align:center; border-bottom:1px dashed var(--line); padding-bottom:12px; margin-bottom:14px;}
   .receipt-head .tag{font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--olive); text-transform:uppercase;}
   .receipt-head .headline{font-size:17px; font-weight:800; color:var(--olive-deep); margin-top:6px; line-height:1.4;}
+  .receipt-head .headline-sub{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
+
+  .basket-main{border-color:var(--olive); box-shadow:0 0 0 1px var(--olive) inset;}
+  .basket-hint{font-size:11px; color:var(--gold); font-weight:600; margin-bottom:6px;}
 
   .basket{
     border:1px solid var(--line);
@@ -550,6 +559,9 @@
   }
   function sumDiscount(arr){ return arr.reduce((s,c)=>s+c.discount,0); }
 
+  // NOTE: one payment (basket) can use exactly ONE coupon in total —
+  // never a sale coupon and a membership coupon together. So every coupon
+  // the customer decides to use needs its own separate basket.
   function buildCombos(allCoupons){
     const subsets = subsetsOf(allCoupons);
     const all = subsets.map(s => ({ coupons: s, discount: sumDiscount(s) }));
@@ -563,6 +575,7 @@
       .map(c => ({ required: c.threshold, coupon: c }));
   }
 
+  // exact backtracking bin-covering partition (all items must be placed)
   function findPartition(itemArr, bins){
     if(bins.length === 0) return null;
     const sorted = [...itemArr].sort((a,b)=> b.price - a.price);
@@ -605,6 +618,11 @@
     return state;
   }
 
+  // turn parsed products + bundle definitions into a flat list of
+  // "assignable items" the partition solver can place into baskets.
+  // a bundle's complete sets become one indivisible item each (must stay
+  // together in one basket); leftover un-bundled units are individually
+  // assignable, same as normal products.
   function buildAssignableItems(products, bundleDefs){
     const pool = {};
     products.forEach(p => pool[p.id] = [...p.units]);
@@ -656,13 +674,87 @@
       if(reqSum > totalSum) continue;
       if(bins.length > itemArr.length) continue;
 
-      const result = findPartition(itemArr, bins);
-      if(result){
-        const baskets = result.map(b => ({ items: b.list, sum: b.sum, coupon: b.coupon }));
-        return { discount: combo.discount, baskets };
+      const feasible = findPartition(itemArr, bins);
+      if(feasible){
+        // discount is already the maximum achievable — now, among all ways to
+        // split items that still hit this same discount, pick the one that
+        // moves the fewest items out of the register's original order (one
+        // basket stays as large/untouched as possible; the rest are minimal).
+        const optimized = minimizeMovedAcrossMains(itemArr, bins) ||
+          feasible.map(b => ({ items:b.list, sum:b.sum, coupon:b.coupon }));
+        return { discount: combo.discount, baskets: optimized };
       }
     }
     return { discount:0, baskets:[{ items:itemArr, sum: totalSum, coupon:null }] };
+  }
+
+  // for a fixed set of coupon "bins", find the split that keeps one basket
+  // (the designated main) as large as possible (item count), while every
+  // other basket still reaches its own coupon threshold using as few items
+  // as possible. Runs once per candidate main bin; the caller keeps the best.
+  function minimizeMovedForMain(items, bins, mainIdx){
+    const sorted = [...items].sort((a,b)=> b.price - a.price);
+    const n = sorted.length;
+    const suffix = new Array(n+1).fill(0);
+    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].price;
+
+    const state = bins.map((b,i)=> ({ required:b.required, sum:0, list:[], coupon:b.coupon, isMain: i===mainIdx }));
+    let bestMoved = Infinity;
+    let bestSnapshot = null;
+    let budget = 500000;
+
+    function rec(i, moved){
+      budget--;
+      if(budget <= 0) return;
+      if(moved >= bestMoved) return; // can't improve on the best found so far
+      if(i === n){
+        if(state.every(b => b.sum >= b.required)){
+          bestMoved = moved;
+          bestSnapshot = state.map(b => ({ items:[...b.list], sum:b.sum, coupon:b.coupon }));
+        }
+        return;
+      }
+      let deficit = 0;
+      for(const b of state) deficit += Math.max(b.required - b.sum, 0);
+      if(deficit > suffix[i]) return;
+
+      // try the main basket first (keeps it big fast, tightens pruning sooner)
+      const order = state.map((b,idx)=>idx).sort((x,y)=>{
+        if(state[x].isMain !== state[y].isMain) return state[x].isMain ? -1 : 1;
+        return (state[y].required-state[y].sum) - (state[x].required-state[x].sum);
+      });
+      const seen = new Set();
+      for(const j of order){
+        const key = state[j].required + '|' + state[j].sum + '|' + state[j].isMain;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        state[j].sum += sorted[i].price;
+        state[j].list.push(sorted[i]);
+        rec(i+1, moved + (state[j].isMain ? 0 : 1));
+        state[j].sum -= sorted[i].price;
+        state[j].list.pop();
+      }
+    }
+
+    rec(0, 0);
+    if(bestSnapshot === null) return null;
+    return { movedCount: bestMoved, baskets: bestSnapshot };
+  }
+
+  function minimizeMovedAcrossMains(items, bins){
+    if(bins.length <= 1){
+      const sum = items.reduce((s,it)=>s+it.price,0);
+      return [{ items, sum, coupon: bins[0] ? bins[0].coupon : null }];
+    }
+    let best = null, bestMoved = Infinity;
+    for(let m=0; m<bins.length; m++){
+      const res = minimizeMovedForMain(items, bins, m);
+      if(res && res.movedCount < bestMoved){
+        bestMoved = res.movedCount;
+        best = res.baskets;
+      }
+    }
+    return best;
   }
 
   // ---------- run + render ----------
@@ -696,9 +788,12 @@
     return `[${src}] ${c.label}`;
   }
 
+  // group a basket's raw assignable items back into readable per-product /
+  // per-bundle lines for display (a basket may contain several units of the
+  // same product, or several complete sets of the same bundle).
   function aggregateBasketItems(items){
-    const units = new Map();
-    const bundlesAgg = new Map();
+    const units = new Map();     // productId -> {count, sum}
+    const bundlesAgg = new Map(); // bundleId -> {count, sum, setSize, memberIds:Set}
     items.forEach(it => {
       if(it.kind === 'unit'){
         const e = units.get(it.productId) || { count:0, sum:0 };
@@ -719,6 +814,15 @@
     const K = res.baskets.length;
     let html = '';
 
+    // the basket with the most individual items is the one to leave as-is;
+    // the rest are what actually needs to be pulled out and paid separately.
+    let mainIdx = 0;
+    res.baskets.forEach((b,i)=>{ if(b.items.length > res.baskets[mainIdx].items.length) mainIdx = i; });
+    const movedCount = res.baskets.reduce((s,b,i)=> s + (i===mainIdx ? 0 : b.items.length), 0);
+    const orderedBaskets = K > 1
+      ? [res.baskets[mainIdx], ...res.baskets.filter((_,i)=>i!==mainIdx)]
+      : res.baskets;
+
     html += `<div class="receipt">`;
     html += `<div class="receipt-head">
       <div class="tag">Result</div>
@@ -728,10 +832,15 @@
           : (K <= 1
               ? `분할 없이 한 번에 결제 · 총 ${res.discount.toLocaleString('ko-KR')}원 할인`
               : `${K}번으로 나눠 결제 · 총 ${res.discount.toLocaleString('ko-KR')}원 할인`)
-      }</div>
+      }</div>${
+        (res.discount > 0 && K > 1)
+          ? `<div class="headline-sub">포스기 목록에서 ${movedCount}개 상품만 따로 빼면 됩니다</div>`
+          : ''
+      }
     </div>`;
 
-    res.baskets.forEach((b, i) => {
+    orderedBaskets.forEach((b, i) => {
+      const isMain = K > 1 && i === 0;
       const { units, bundlesAgg } = aggregateBasketItems(b.items);
       const lines = [];
       bundlesAgg.forEach(e => {
@@ -743,11 +852,16 @@
         lines.push(`<b>${pid}번</b> 상품 × ${e.count}개 = ${e.sum.toLocaleString('ko-KR')}원`);
       });
 
-      html += `<div class="basket">
+      const title = K <= 1
+        ? '결제'
+        : (isMain ? '메인 결제 · 포스기 목록 그대로' : `분리 결제 ${i}`);
+
+      html += `<div class="basket${isMain ? ' basket-main' : ''}">
         <div class="basket-title">
-          <span class="name">${K<=1 ? '결제' : (i+1)+'차 결제'}</span>
+          <span class="name">${title}</span>
           <span class="sum">${b.sum.toLocaleString('ko-KR')}원</span>
         </div>
+        ${!isMain && K>1 ? `<div class="basket-hint">포스기 목록에서 아래 상품만 빼서 별도 결제</div>` : ''}
         <div class="basket-items">${lines.join('<br>')}</div>`;
 
       const lbl = couponLabelFor(b.coupon);
@@ -773,14 +887,13 @@
   }
 
 })();
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('SW Registered!', reg))
-      .catch(err => console.error('SW Register Error:', err));
-  });
-}
+</script>
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    });
+  }
 </script>
 </body>
 </html>

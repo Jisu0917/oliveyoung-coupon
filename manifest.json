@@ -1,21 +1,32 @@
 {
   "name": "올영세일 분할결제 쿠폰 계산기",
-  "short_name": "올영계산기",
-  "description": "올리브영 분할결제 및 쿠폰 최적 조합 계산기",
+  "short_name": "올영쿠폰계산기",
+  "description": "올영세일 첫날 쿠폰팩과 멤버십 쿠폰을 최대한 활용해 분할결제 할인을 계산해주는 도구",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#FBF7EE",
-  "theme_color": "#3F6B33",
+  "orientation": "portrait",
+  "background_color": "#EDE7D3",
+  "theme_color": "#24421C",
+  "lang": "ko",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
