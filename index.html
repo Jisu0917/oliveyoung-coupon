@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#24421C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="쿠폰 최적화">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>올영세일 분할결제 쿠폰 계산기</title>
+<style>
+  :root{
+    --ink:#1F2A1D;
+    --ink-soft:#5B6455;
+    --olive:#3F6B33;
+    --olive-deep:#24421C;
+    --olive-pale:#EAF0E3;
+    --paper:#FBF7EE;
+    --paper-2:#F3EEDF;
+    --line:#D8CFB6;
+    --gold:#A9761F;
+    --gold-pale:#F6ECD3;
+    --danger:#A23E3E;
+    --danger-pale:#F6E4E1;
+    --radius:14px;
+    --mono: ui-monospace, 'SF Mono', 'Courier New', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--sans);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #F4EFDF 0%, #EDE7D3 55%, #E6DEC5 100%);
+    color:var(--ink);
+    min-height:100vh;
+    padding:0 0 60px;
+  }
+  .wrap{max-width:480px; margin:0 auto; padding:22px 16px 0;}
+
+  header.top{padding:6px 4px 18px;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--olive-deep);
+    text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow::before{content:"";width:16px;height:2px;background:var(--olive);display:inline-block;}
+  h1{
+    font-size:24px;
+    line-height:1.28;
+    margin:8px 0 4px;
+    font-weight:800;
+    color:var(--olive-deep);
+    letter-spacing:-0.01em;
+  }
+  .sub{font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin:0;}
+
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 16px;
+    margin-bottom:14px;
+    box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+  .card h2{
+    font-size:13px;
+    margin:0 0 12px;
+    color:var(--olive-deep);
+    display:flex; align-items:center; gap:8px;
+    font-weight:700;
+  }
+  .card h2 .num{
+    width:20px;height:20px;border-radius:50%;
+    background:var(--olive); color:#fff;
+    font-family:var(--mono); font-size:11px;
+    display:inline-flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+
+  /* item rows */
+  #itemList{display:flex; flex-direction:column; gap:8px;}
+  .item-row{
+    display:flex; align-items:center; gap:8px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:6px 8px 6px 12px;
+  }
+  .item-row .idx{
+    font-family:var(--mono); font-size:12px; color:var(--ink-soft);
+    width:22px; flex-shrink:0;
+  }
+  .item-row input{
+    flex:1; border:none; outline:none; background:transparent;
+    font-family:var(--mono); font-size:16px; color:var(--ink);
+    min-width:0; padding:8px 0;
+  }
+  .item-row .won{font-family:var(--mono); font-size:13px; color:var(--ink-soft); flex-shrink:0;}
+  .item-row button.del{
+    border:none; background:var(--danger-pale); color:var(--danger);
+    width:28px;height:28px;border-radius:8px; font-size:15px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .row-actions{display:flex; gap:8px; margin-top:12px;}
+  .btn{
+    border:none; border-radius:10px; padding:11px 14px;
+    font-size:13.5px; font-weight:600; font-family:var(--sans);
+    cursor:pointer;
+  }
+  .btn-add{background:var(--olive-pale); color:var(--olive-deep); flex:1;}
+  .btn-ghost{background:transparent; color:var(--ink-soft); border:1px dashed var(--line); flex:1;}
+
+  .paste-box{margin-top:10px;}
+  .paste-box textarea{
+    width:100%; min-height:64px; border-radius:10px; border:1px solid var(--line);
+    background:#fff; font-family:var(--mono); font-size:13px; padding:10px;
+    resize:vertical;
+  }
+  .paste-box .hint{font-size:11.5px; color:var(--ink-soft); margin:6px 2px 8px;}
+  .paste-box .btn-mini{
+    background:var(--paper-2); color:var(--olive-deep); border:1px solid var(--line);
+    font-size:12.5px; padding:8px 12px; border-radius:8px;
+  }
+
+  .total-line{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);
+  }
+  .total-line .lbl{font-size:13px; color:var(--ink-soft);}
+  .total-line .val{font-family:var(--mono); font-size:19px; font-weight:700; color:var(--olive-deep);}
+
+  /* membership pills */
+  .pillrow{display:flex; flex-wrap:wrap; gap:8px;}
+  .pill{
+    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    padding:9px 14px; border-radius:999px; font-size:13.5px; font-weight:600;
+    cursor:pointer;
+  }
+  .pill.active{background:var(--olive); border-color:var(--olive); color:#fff;}
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; margin-top:2px;
+  }
+  .toggle-row .t-label{font-size:13.5px; font-weight:600;}
+  .toggle-row .t-desc{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .switch{position:relative; width:44px; height:26px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .slider{position:absolute; inset:0; background:#D8D2BF; border-radius:999px; transition:.15s;}
+  .slider::before{content:""; position:absolute; width:20px;height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s;}
+  .switch input:checked + .slider{background:var(--olive);}
+  .switch input:checked + .slider::before{transform:translateX(18px);}
+
+  .calc-btn{
+    width:100%; padding:16px; font-size:16px; font-weight:800;
+    background:var(--olive-deep); color:#fff; border:none; border-radius:12px;
+    letter-spacing:-0.01em;
+    box-shadow:0 6px 16px rgba(36,66,28,.28);
+  }
+  .calc-btn:active{transform:translateY(1px);}
+  .err{
+    color:var(--danger); font-size:12.5px; margin-top:10px; display:none;
+    background:var(--danger-pale); padding:8px 10px; border-radius:8px;
+  }
+
+  /* receipt result */
+  #result{margin-top:22px; display:none;}
+  .receipt{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 18px 22px;
+    position:relative;
+    margin-bottom:16px;
+  }
+  .receipt::after{
+    content:"";
+    position:absolute; left:0; right:0; bottom:-8px; height:16px;
+    background-image: radial-gradient(circle at 8px 0, transparent 8px, var(--paper) 8.5px);
+    background-size:16px 16px;
+    background-repeat:repeat-x;
+    background-position: -4px 0;
+    display:none;
+  }
+  .receipt-head{text-align:center; border-bottom:1px dashed var(--line); padding-bottom:12px; margin-bottom:14px;}
+  .receipt-head .tag{font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--olive); text-transform:uppercase;}
+  .receipt-head .headline{font-size:17px; font-weight:800; color:var(--olive-deep); margin-top:6px; line-height:1.4;}
+
+  .basket{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:12px;
+    background:#fff;
+  }
+  .basket-title{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .basket-title .name{font-weight:800; font-size:14.5px; color:var(--olive-deep);}
+  .basket-title .sum{font-family:var(--mono); font-weight:700; font-size:14px;}
+  .basket-items{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); line-height:1.7; word-break:keep-all;}
+  .basket-items b{color:var(--ink); font-weight:600;}
+  .coupon-line{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:8px; padding:8px 10px;
+    background:var(--gold-pale); border-radius:8px;
+  }
+  .coupon-line .c-name{font-size:12.5px; color:#6b4e10; font-weight:600;}
+  .coupon-line .c-off{font-family:var(--mono); font-size:13px; font-weight:800; color:var(--gold);}
+  .coupon-line + .coupon-line{margin-top:6px;}
+  .basket-none{font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
+
+  .summary{
+    border-top:1px dashed var(--line); margin-top:6px; padding-top:14px;
+  }
+  .summary .line{display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;}
+  .summary .line.grand{
+    font-size:16px; font-weight:800; color:var(--olive-deep);
+    border-top:1px solid var(--line); padding-top:10px; margin-top:6px;
+  }
+  .summary .val{font-family:var(--mono); font-weight:700;}
+  .summary .val.off{color:var(--gold);}
+
+  .note{font-size:11.5px; color:var(--ink-soft); line-height:1.6; margin-top:10px; text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">Olive Young · Day 1 Split-Pay</div>
+    <h1>올영세일 분할결제<br>쿠폰 최적화 계산기</h1>
+    <p class="sub">상품 금액을 포스기 순서대로 입력하면, 보유한 쿠폰을 최대한 조합해 몇 번으로 나눠 결제해야 할인이 가장 큰지 계산해드려요.</p>
+  </header>
+
+  <div class="card">
+    <h2><span class="num">1</span>상품 금액 입력</h2>
+    <div id="itemList"></div>
+    <div class="row-actions">
+      <button class="btn btn-add" id="addBtn">+ 상품 추가</button>
+      <button class="btn btn-ghost" id="pasteToggleBtn">여러 개 한번에 입력</button>
+    </div>
+    <div class="paste-box" id="pasteBox" style="display:none;">
+      <div class="hint">쉼표( , ) 또는 줄바꿈으로 구분해서 붙여넣으세요. 예) 32000, 15900, 48000</div>
+      <textarea id="pasteArea" placeholder="32000, 15900, 48000"></textarea>
+      <div style="margin-top:8px;"><button class="btn-mini" id="pasteApplyBtn">목록에 추가</button></div>
+    </div>
+    <div class="total-line">
+      <span class="lbl">현재 합계</span>
+      <span class="val" id="totalSum">0원</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span>멤버십 등급</h2>
+    <div class="pillrow" id="tierPills">
+      <button class="pill active" data-tier="없음">없음</button>
+      <button class="pill" data-tier="Baby">Baby</button>
+      <button class="pill" data-tier="Pink">Pink</button>
+      <button class="pill" data-tier="Green">Green</button>
+      <button class="pill" data-tier="Black">Black</button>
+      <button class="pill" data-tier="Gold">Gold</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">3</span>올영세일 쿠폰팩</h2>
+    <div class="toggle-row">
+      <div>
+        <div class="t-label">첫날 한정 쿠폰팩 사용 가능</div>
+        <div class="t-desc">3만/5만/7만/11만원 구간별 할인쿠폰 4장</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="saleToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <button class="calc-btn" id="calcBtn">최대 할인 계산하기</button>
+  <div class="err" id="errBox"></div>
+
+  <div id="result"></div>
+
+  <p class="note">계산 결과는 참고용입니다. 실제 포스기 쿠폰 적용 가능 여부를 함께 확인해주세요.</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- coupon data ----------
+  const SALE_COUPONS = [
+    {threshold:30000,  discount:3000,  label:"3만원 이상 3천원 할인"},
+    {threshold:50000,  discount:6000,  label:"5만원 이상 6천원 할인"},
+    {threshold:70000,  discount:10000, label:"7만원 이상 1만원 할인"},
+    {threshold:110000, discount:20000, label:"11만원 이상 2만원 할인"},
+  ];
+  const MEMBERSHIP_COUPONS = {
+    "없음": [],
+    "Baby": [
+      {threshold:30000, discount:1000, label:"3만원 이상 1천원 할인"}
+    ],
+    "Pink": [
+      {threshold:40000, discount:2000, label:"4만원 이상 2천원 할인"}
+    ],
+    "Green": [
+      {threshold:50000, discount:3000, label:"5만원 이상 3천원 할인"},
+      {threshold:70000, discount:5000, label:"7만원 이상 5천원 할인"}
+    ],
+    "Black": [
+      {threshold:50000, discount:4000, label:"5만원 이상 4천원 할인"},
+      {threshold:70000, discount:6000, label:"7만원 이상 6천원 할인"},
+      {threshold:90000, discount:9000, label:"9만원 이상 9천원 할인"}
+    ],
+    "Gold": [
+      {threshold:50000,  discount:4000,  label:"5만원 이상 4천원 할인"},
+      {threshold:80000,  discount:8000,  label:"8만원 이상 8천원 할인"},
+      {threshold:100000, discount:12000, label:"10만원 이상 1만2천원 할인"}
+    ],
+  };
+
+  // ---------- state ----------
+  let items = []; // {id, value}
+  let nextId = 1;
+  let currentTier = "없음";
+
+  function fmt(n){ return n.toLocaleString('ko-KR') + "원"; }
+
+  // ---------- item list rendering ----------
+  const itemListEl = document.getElementById('itemList');
+  const totalSumEl = document.getElementById('totalSum');
+
+  function addItem(value){
+    items.push({id: nextId++, value: value || ""});
+    renderItems();
+  }
+  function removeItem(id){
+    items = items.filter(it => it.id !== id);
+    renderItems();
+  }
+  function renderItems(){
+    itemListEl.innerHTML = "";
+    items.forEach((it, i) => {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `
+        <span class="idx">${i+1}</span>
+        <input type="tel" inputmode="numeric" placeholder="가격 입력" value="${it.value}">
+        <span class="won">원</span>
+        <button class="del" aria-label="삭제">✕</button>
+      `;
+      const input = row.querySelector('input');
+      input.addEventListener('input', (e)=>{
+        const raw = e.target.value.replace(/[^0-9]/g,'');
+        it.value = raw;
+        e.target.value = raw ? Number(raw).toLocaleString('ko-KR') : '';
+        updateTotal();
+      });
+      row.querySelector('.del').addEventListener('click', ()=> removeItem(it.id));
+      itemListEl.appendChild(row);
+    });
+    updateTotal();
+  }
+  function updateTotal(){
+    const total = items.reduce((s,it)=> s + (parseInt(it.value)||0), 0);
+    totalSumEl.textContent = fmt(total);
+  }
+
+  document.getElementById('addBtn').addEventListener('click', ()=> addItem(""));
+
+  // paste box
+  const pasteBox = document.getElementById('pasteBox');
+  document.getElementById('pasteToggleBtn').addEventListener('click', ()=>{
+    pasteBox.style.display = pasteBox.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('pasteApplyBtn').addEventListener('click', ()=>{
+    const raw = document.getElementById('pasteArea').value;
+    const nums = raw.split(/[,\n]/).map(s=>s.replace(/[^0-9]/g,'')).filter(s=>s.length>0);
+    nums.forEach(n => addItem(n));
+    document.getElementById('pasteArea').value = '';
+    pasteBox.style.display = 'none';
+  });
+
+  // tier pills
+  document.getElementById('tierPills').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.pill');
+    if(!btn) return;
+    document.querySelectorAll('#tierPills .pill').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    currentTier = btn.dataset.tier;
+  });
+
+  // seed with 3 empty rows
+  addItem(""); addItem(""); addItem("");
+
+  // ---------- optimization engine ----------
+  function subsetsOf(arr){
+    const n = arr.length, res = [];
+    for(let mask=0; mask<(1<<n); mask++){
+      const sub = [];
+      for(let i=0;i<n;i++) if(mask & (1<<i)) sub.push(arr[i]);
+      res.push(sub);
+    }
+    return res;
+  }
+  function sumDiscount(arr){ return arr.reduce((s,c)=>s+c.discount,0); }
+
+  // NOTE: one payment (basket) can use exactly ONE coupon in total —
+  // never a sale coupon and a membership coupon together. So every coupon
+  // the customer decides to use needs its own separate basket.
+  function buildCombos(allCoupons){
+    const subsets = subsetsOf(allCoupons);
+    const all = subsets.map(s => ({ coupons: s, discount: sumDiscount(s) }));
+    all.sort((a,b)=> b.discount - a.discount);
+    return all;
+  }
+
+  function buildBins(coupons){
+    return [...coupons]
+      .sort((a,b)=> b.threshold - a.threshold)
+      .map(c => ({ required: c.threshold, coupon: c }));
+  }
+
+  // exact backtracking bin-covering partition (all items must be placed)
+  function findPartition(itemArr, bins){
+    if(bins.length === 0) return null;
+    const sorted = [...itemArr].sort((a,b)=> b.price - a.price);
+    const n = sorted.length;
+    const suffix = new Array(n+1).fill(0);
+    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].price;
+
+    const state = bins.map(b => ({ required: b.required, sum: 0, list: [], coupon: b.coupon }));
+    let budget = 220000;
+
+    function rec(i){
+      budget--;
+      if(budget <= 0) return false;
+      if(i === n){
+        return state.every(b => b.sum >= b.required);
+      }
+      let deficit = 0;
+      for(const b of state) deficit += Math.max(b.required - b.sum, 0);
+      if(deficit > suffix[i]) return false;
+
+      const order = state.map((b,idx)=>idx)
+        .sort((x,y)=> (state[y].required-state[y].sum) - (state[x].required-state[x].sum));
+
+      const seen = new Set();
+      for(const j of order){
+        const key = state[j].required + '|' + state[j].sum;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        state[j].sum += sorted[i].price;
+        state[j].list.push(sorted[i]);
+        if(rec(i+1)) return true;
+        state[j].sum -= sorted[i].price;
+        state[j].list.pop();
+      }
+      return false;
+    }
+
+    const ok = rec(0);
+    if(!ok) return null;
+    return state;
+  }
+
+  function optimize(itemArr, tier, saleEnabled){
+    const saleList = (saleEnabled ? SALE_COUPONS : []).map(c => ({ ...c, kind:'sale' }));
+    const memList = (MEMBERSHIP_COUPONS[tier] || []).map(c => ({ ...c, kind:'mem' }));
+    const allCoupons = saleList.concat(memList);
+    const totalSum = itemArr.reduce((s,it)=> s + it.price, 0);
+    const allCombos = buildCombos(allCoupons);
+
+    for(const combo of allCombos){
+      if(combo.discount === 0){
+        return { discount:0, baskets:[{ items:itemArr, sum: totalSum, coupon:null }] };
+      }
+      const bins = buildBins(combo.coupons);
+      const reqSum = bins.reduce((s,b)=> s + b.required, 0);
+      if(reqSum > totalSum) continue;
+      if(bins.length > itemArr.length) continue;
+
+      const result = findPartition(itemArr, bins);
+      if(result){
+        const baskets = result.map(b => ({ items: b.list, sum: b.sum, coupon: b.coupon }));
+        return { discount: combo.discount, baskets };
+      }
+    }
+    return { discount:0, baskets:[{ items:itemArr, sum: totalSum, coupon:null }] };
+  }
+
+  // ---------- run + render ----------
+  const errBox = document.getElementById('errBox');
+  const resultEl = document.getElementById('result');
+
+  document.getElementById('calcBtn').addEventListener('click', ()=>{
+    errBox.style.display = 'none';
+    resultEl.style.display = 'none';
+
+    const parsed = items
+      .map((it,i)=> ({ price: parseInt(it.value)||0, idx: i+1 }))
+      .filter(it => it.price > 0);
+
+    if(parsed.length === 0){
+      errBox.textContent = "상품 금액을 1개 이상 입력해주세요.";
+      errBox.style.display = 'block';
+      return;
+    }
+
+    const saleEnabled = document.getElementById('saleToggle').checked;
+    const res = optimize(parsed, currentTier, saleEnabled);
+    renderResult(res, parsed);
+  });
+
+  function couponLabelFor(c){
+    if(!c) return null;
+    const src = c.kind === 'sale' ? '올영세일' : `멤버십 · ${currentTier}`;
+    return `[${src}] ${c.label}`;
+  }
+
+  function renderResult(res, allItems){
+    const totalSum = allItems.reduce((s,it)=>s+it.price,0);
+    const K = res.baskets.length;
+    let html = '';
+
+    html += `<div class="receipt">`;
+    html += `<div class="receipt-head">
+      <div class="tag">Result</div>
+      <div class="headline">${
+        res.discount === 0
+          ? '적용 가능한 쿠폰이 없습니다'
+          : (K <= 1
+              ? `분할 없이 한 번에 결제 · 총 ${res.discount.toLocaleString('ko-KR')}원 할인`
+              : `${K}번으로 나눠 결제 · 총 ${res.discount.toLocaleString('ko-KR')}원 할인`)
+      }</div>
+    </div>`;
+
+    res.baskets.forEach((b, i) => {
+      const sortedByIdx = [...b.items].sort((a,z)=> a.idx - z.idx);
+      const itemsStr = sortedByIdx
+        .map(it => `<b>${it.idx}번</b>(${it.price.toLocaleString('ko-KR')}원)`)
+        .join(', ');
+
+      html += `<div class="basket">
+        <div class="basket-title">
+          <span class="name">${K<=1 ? '결제' : (i+1)+'차 결제'}</span>
+          <span class="sum">${b.sum.toLocaleString('ko-KR')}원</span>
+        </div>
+        <div class="basket-items">${itemsStr}</div>`;
+
+      const lbl = couponLabelFor(b.coupon);
+      if(lbl){
+        html += `<div class="coupon-line"><span class="c-name">${lbl}</span><span class="c-off">-${b.coupon.discount.toLocaleString('ko-KR')}원</span></div>`;
+      } else {
+        html += `<div class="basket-none">적용 쿠폰 없음</div>`;
+      }
+      html += `</div>`;
+    });
+
+    html += `<div class="summary">
+      <div class="line"><span>원래 합계</span><span class="val">${totalSum.toLocaleString('ko-KR')}원</span></div>
+      <div class="line"><span>총 할인</span><span class="val off">-${res.discount.toLocaleString('ko-KR')}원</span></div>
+      <div class="line grand"><span>최종 결제 총액</span><span class="val">${(totalSum-res.discount).toLocaleString('ko-KR')}원</span></div>
+    </div>`;
+
+    html += `</div>`;
+
+    resultEl.innerHTML = html;
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
