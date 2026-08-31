@@ -1,12 +1,11 @@
 {
   "name": "올영세일 분할결제 쿠폰 최적화 계산기",
   "short_name": "쿠폰 최적화",
-  "description": "올영세일 및 멤버십 쿠폰의 분할결제 최적화를 계산합니다.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FBF7EE",
+  "background_color": "#ffffff",
   "theme_color": "#24421C",
   "lang": "ko-KR",
   "icons": [
