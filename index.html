@@ -7,7 +7,7 @@
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#24421C">
+<meta name="theme-color" content="#FFD8EA">
 <meta name="description" content="올영세일 첫날 쿠폰팩과 멤버십 쿠폰을 최대한 활용해 분할결제 할인을 계산해주는 도구">
 
 <!-- iOS home-screen support -->
@@ -19,29 +19,37 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 
 <style>
+  @font-face{
+    font-family:'MallangGalmuri';
+    src:url('fonts/Mallang-Galmuri11-R.ttf') format('truetype');
+    font-weight:400;
+    font-style:normal;
+    font-display:swap;
+  }
   :root{
-    --ink:#1F2A1D;
-    --ink-soft:#5B6455;
-    --olive:#3F6B33;
-    --olive-deep:#24421C;
-    --olive-pale:#EAF0E3;
-    --paper:#FBF7EE;
-    --paper-2:#F3EEDF;
-    --line:#D8CFB6;
-    --gold:#A9761F;
-    --gold-pale:#F6ECD3;
-    --danger:#A23E3E;
-    --danger-pale:#F6E4E1;
-    --radius:14px;
-    --mono: ui-monospace, 'SF Mono', 'Courier New', monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
+    --ink:#4A3742;
+    --ink-soft:#A98999;
+    --pink:#FF8FAE;
+    --pink-deep:#E85C82;
+    --pink-pale:#FFE6EF;
+    --paper:#FFFBFD;
+    --paper-2:#FFF0F5;
+    --line:#F5D3E0;
+    --gold:#E5446D;
+    --gold-pale:#FFE0EA;
+    --danger:#D1476B;
+    --danger-pale:#FBE1E9;
+    --radius:18px;
+    --mono: 'MallangGalmuri', ui-monospace, 'SF Mono', 'Courier New', monospace;
+    --sans: 'MallangGalmuri', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  button, input, textarea, select{font-family:inherit;}
   html,body{margin:0;padding:0;}
   body{
     font-family:var(--sans);
     background:
-      radial-gradient(1200px 600px at 50% -10%, #F4EFDF 0%, #EDE7D3 55%, #E6DEC5 100%);
+      radial-gradient(1200px 600px at 50% -10%, #FFF3F8 0%, #FFE6F1 55%, #FFD8EA 100%);
     color:var(--ink);
     min-height:100vh;
     padding:0 0 60px;
@@ -53,17 +61,18 @@
     font-family:var(--mono);
     font-size:11px;
     letter-spacing:.14em;
-    color:var(--olive-deep);
+    color:var(--pink-deep);
     text-transform:uppercase;
     display:flex; align-items:center; gap:8px;
   }
-  .eyebrow::before{content:"";width:16px;height:2px;background:var(--olive);display:inline-block;}
+  .eyebrow::before{content:none;}
+  .eyebrow .bow-ico{color:var(--pink); flex-shrink:0;}
   h1{
     font-size:24px;
     line-height:1.28;
     margin:8px 0 4px;
     font-weight:800;
-    color:var(--olive-deep);
+    color:var(--pink-deep);
     letter-spacing:-0.01em;
   }
   .sub{font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin:0;}
@@ -79,13 +88,13 @@
   .card h2{
     font-size:13px;
     margin:0 0 12px;
-    color:var(--olive-deep);
+    color:var(--pink-deep);
     display:flex; align-items:center; gap:8px;
     font-weight:700;
   }
   .card h2 .num{
     width:20px;height:20px;border-radius:50%;
-    background:var(--olive); color:#fff;
+    background:var(--pink); color:#fff;
     font-family:var(--mono); font-size:11px;
     display:inline-flex; align-items:center; justify-content:center;
     flex-shrink:0;
@@ -107,13 +116,13 @@
     background:#fff; border:1px solid var(--line); border-radius:9px;
     padding:9px 10px;
   }
-  .prod-row.in-bundle{background:var(--gold-pale); border-color:#E9D9AE;}
-  .prod-row input[type="checkbox"]{width:17px;height:17px; flex-shrink:0; accent-color:var(--olive);}
+  .prod-row.in-bundle{background:var(--gold-pale); border-color:#FBC6DA;}
+  .prod-row input[type="checkbox"]{width:17px;height:17px; flex-shrink:0; accent-color:var(--pink);}
   .prod-idx{font-family:var(--mono); font-size:12px; color:var(--ink-soft); width:34px; flex-shrink:0;}
   .prod-detail{flex:1; font-size:12.5px; color:var(--ink-soft); font-family:var(--mono);}
   .prod-sum{font-family:var(--mono); font-size:13px; font-weight:700; flex-shrink:0;}
   .prod-bundle-tag{
-    font-size:10.5px; font-weight:700; color:#6b4e10; background:#EFDBA0;
+    font-size:10.5px; font-weight:700; color:#9A2F55; background:#FFC7DC;
     padding:2px 7px; border-radius:999px; flex-shrink:0;
   }
 
@@ -143,14 +152,14 @@
     font-size:13.5px; font-weight:600; font-family:var(--sans);
     cursor:pointer;
   }
-  .btn-add{background:var(--olive-pale); color:var(--olive-deep);}
+  .btn-add{background:var(--pink-pale); color:var(--pink-deep);}
 
   .total-line{
     display:flex; justify-content:space-between; align-items:baseline;
     margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);
   }
   .total-line .lbl{font-size:13px; color:var(--ink-soft);}
-  .total-line .val{font-family:var(--mono); font-size:19px; font-weight:700; color:var(--olive-deep);}
+  .total-line .val{font-family:var(--mono); font-size:19px; font-weight:700; color:var(--pink-deep);}
 
   /* membership pills */
   .pillrow{display:flex; flex-wrap:wrap; gap:8px;}
@@ -159,7 +168,7 @@
     padding:9px 14px; border-radius:999px; font-size:13.5px; font-weight:600;
     cursor:pointer;
   }
-  .pill.active{background:var(--olive); border-color:var(--olive); color:#fff;}
+  .pill.active{background:var(--pink); border-color:var(--pink); color:#fff;}
 
   .toggle-row{
     display:flex; align-items:center; justify-content:space-between;
@@ -170,16 +179,16 @@
   .toggle-row .t-desc{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
   .switch{position:relative; width:44px; height:26px; flex-shrink:0;}
   .switch input{opacity:0; width:0; height:0;}
-  .slider{position:absolute; inset:0; background:#D8D2BF; border-radius:999px; transition:.15s;}
+  .slider{position:absolute; inset:0; background:#F3D6E2; border-radius:999px; transition:.15s;}
   .slider::before{content:""; position:absolute; width:20px;height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s;}
-  .switch input:checked + .slider{background:var(--olive);}
+  .switch input:checked + .slider{background:var(--pink);}
   .switch input:checked + .slider::before{transform:translateX(18px);}
 
   .calc-btn{
     width:100%; padding:16px; font-size:16px; font-weight:800;
-    background:var(--olive-deep); color:#fff; border:none; border-radius:12px;
+    background:var(--pink-deep); color:#fff; border:none; border-radius:12px;
     letter-spacing:-0.01em;
-    box-shadow:0 6px 16px rgba(36,66,28,.28);
+    box-shadow:0 6px 16px rgba(232,92,130,.35);
   }
   .calc-btn:active{transform:translateY(1px);}
   .err{
@@ -207,11 +216,12 @@
     display:none;
   }
   .receipt-head{text-align:center; border-bottom:1px dashed var(--line); padding-bottom:12px; margin-bottom:14px;}
-  .receipt-head .tag{font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--olive); text-transform:uppercase;}
-  .receipt-head .headline{font-size:17px; font-weight:800; color:var(--olive-deep); margin-top:6px; line-height:1.4;}
+  .receipt-head .tag{font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--pink); text-transform:uppercase;}
+  .receipt-head .tag .bow-ico{vertical-align:-2px; margin-right:1px;}
+  .receipt-head .headline{font-size:17px; font-weight:800; color:var(--pink-deep); margin-top:6px; line-height:1.4;}
   .receipt-head .headline-sub{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
 
-  .basket-main{border-color:var(--olive); box-shadow:0 0 0 1px var(--olive) inset;}
+  .basket-main{border-color:var(--pink); box-shadow:0 0 0 1px var(--pink) inset;}
   .basket-hint{font-size:11px; color:var(--gold); font-weight:600; margin-bottom:6px;}
 
   .basket{
@@ -225,7 +235,7 @@
     display:flex; align-items:center; justify-content:space-between;
     margin-bottom:10px;
   }
-  .basket-title .name{font-weight:800; font-size:14.5px; color:var(--olive-deep);}
+  .basket-title .name{font-weight:800; font-size:14.5px; color:var(--pink-deep);}
   .basket-title .sum{font-family:var(--mono); font-weight:700; font-size:14px;}
   .basket-items{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); line-height:1.7; word-break:keep-all;}
   .basket-items b{color:var(--ink); font-weight:600;}
@@ -234,7 +244,7 @@
     margin-top:8px; padding:8px 10px;
     background:var(--gold-pale); border-radius:8px;
   }
-  .coupon-line .c-name{font-size:12.5px; color:#6b4e10; font-weight:600;}
+  .coupon-line .c-name{font-size:12.5px; color:#9A2F55; font-weight:600;}
   .coupon-line .c-off{font-family:var(--mono); font-size:13px; font-weight:800; color:var(--gold);}
   .coupon-line + .coupon-line{margin-top:6px;}
   .basket-none{font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
@@ -244,7 +254,7 @@
   }
   .summary .line{display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;}
   .summary .line.grand{
-    font-size:16px; font-weight:800; color:var(--olive-deep);
+    font-size:16px; font-weight:800; color:var(--pink-deep);
     border-top:1px solid var(--line); padding-top:10px; margin-top:6px;
   }
   .summary .val{font-family:var(--mono); font-weight:700;}
@@ -263,7 +273,7 @@
 <div class="wrap">
 
   <header class="top">
-    <div class="eyebrow">Olive Young · Day 1 Split-Pay</div>
+    <div class="eyebrow"><svg class="bow-ico" width="13" height="13" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg>Olive Young · Day 1 Split-Pay</div>
     <h1>올영세일 분할결제<br>쿠폰 최적화 계산기</h1>
     <p class="sub">상품 금액을 포스기 순서대로 입력하면, 보유한 쿠폰을 최대한 조합해 몇 번으로 나눠 결제해야 할인이 가장 큰지 계산해드려요.</p>
   </header>
@@ -832,7 +842,7 @@
 
     html += `<div class="receipt">`;
     html += `<div class="receipt-head">
-      <div class="tag">Result</div>
+      <div class="tag"><svg class="bow-ico" width="12" height="12" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg> Result</div>
       <div class="headline">${
         res.discount === 0
           ? '적용 가능한 쿠폰이 없습니다'

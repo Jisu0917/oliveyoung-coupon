@@ -1,11 +1,12 @@
 // Bump this version string whenever index.html (or any cached asset) changes,
 // so returning users get the update instead of a stale cached copy.
-const CACHE_NAME = 'olive-coupon-calc-v2';
+const CACHE_NAME = 'olive-coupon-calc-v5';
 
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './fonts/Mallang-Galmuri11-R.ttf',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-512-maskable.png',
