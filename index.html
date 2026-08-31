@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>올영세일 분할결제 쿠폰 계산기</title>
+
+<!-- PWA 관련 설정 추가 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3F6B33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="올영계산기">
+<link rel="apple-touch-icon" href="icon-192.png">
+
 <style>
   :root{
     --ink:#1F2A1D;
@@ -265,7 +274,7 @@
 
   <div class="card" id="bundleCard" style="display:none;">
     <h2><span class="num">+</span>1+1 / 2+1 묶음 설정 <span class="opt">(해당 시에만)</span></h2>
-    <p class="sub" style="margin-bottom:10px;">서로 다른 상품이라도 가격이 같고 1+1·2+1처럼 교차 선택해서 묶어 파는 상품이면, 위 목록에서 해당 상품들을 체크한 뒤 묶음을 만들어주세요. 묶인 상품은 분할결제 시 항상 같은 결제에 들어갑니다.</p>
+    <p class="sub" style="margin-bottom:10px;">1+1·2+1처럼 세트로 묶어 파는 상품이면 위 목록에서 체크하고 묶음을 만드세요. 한 상품의 수량만으로 세트가 나오면 그 상품 하나만 체크해도 되고, 가격이 같은 여러 상품을 교차 선택해서 묶어도 됩니다. 묶인 세트는 분할결제 시 항상 같은 결제에 들어갑니다.</p>
     <div class="pillrow" id="bundleTypePills">
       <button class="pill active" data-size="2">1+1 (2개)</button>
       <button class="pill" data-size="3">2+1 (3개)</button>
@@ -471,8 +480,8 @@
   document.getElementById('makeBundleBtn').addEventListener('click', ()=>{
     clearBundleErr();
     const ids = [...selectedIds];
-    if(ids.length < 2){
-      showBundleErr('묶을 상품을 2개 이상 체크해주세요.');
+    if(ids.length < 1){
+      showBundleErr('묶을 상품을 1개 이상 체크해주세요.');
       return;
     }
     const prods = parsedProducts.filter(p => ids.includes(p.id));
@@ -541,9 +550,6 @@
   }
   function sumDiscount(arr){ return arr.reduce((s,c)=>s+c.discount,0); }
 
-  // NOTE: one payment (basket) can use exactly ONE coupon in total —
-  // never a sale coupon and a membership coupon together. So every coupon
-  // the customer decides to use needs its own separate basket.
   function buildCombos(allCoupons){
     const subsets = subsetsOf(allCoupons);
     const all = subsets.map(s => ({ coupons: s, discount: sumDiscount(s) }));
@@ -557,7 +563,6 @@
       .map(c => ({ required: c.threshold, coupon: c }));
   }
 
-  // exact backtracking bin-covering partition (all items must be placed)
   function findPartition(itemArr, bins){
     if(bins.length === 0) return null;
     const sorted = [...itemArr].sort((a,b)=> b.price - a.price);
@@ -600,11 +605,6 @@
     return state;
   }
 
-  // turn parsed products + bundle definitions into a flat list of
-  // "assignable items" the partition solver can place into baskets.
-  // a bundle's complete sets become one indivisible item each (must stay
-  // together in one basket); leftover un-bundled units are individually
-  // assignable, same as normal products.
   function buildAssignableItems(products, bundleDefs){
     const pool = {};
     products.forEach(p => pool[p.id] = [...p.units]);
@@ -696,12 +696,9 @@
     return `[${src}] ${c.label}`;
   }
 
-  // group a basket's raw assignable items back into readable per-product /
-  // per-bundle lines for display (a basket may contain several units of the
-  // same product, or several complete sets of the same bundle).
   function aggregateBasketItems(items){
-    const units = new Map();     // productId -> {count, sum}
-    const bundlesAgg = new Map(); // bundleId -> {count, sum, setSize, memberIds:Set}
+    const units = new Map();
+    const bundlesAgg = new Map();
     items.forEach(it => {
       if(it.kind === 'unit'){
         const e = units.get(it.productId) || { count:0, sum:0 };
@@ -776,10 +773,14 @@
   }
 
 })();
-</script>
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", function(){ navigator.serviceWorker.register("./sw.js").catch(function(){}); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW Registered!', reg))
+      .catch(err => console.error('SW Register Error:', err));
+  });
 }
-</script></body>
+</script>
+</body>
 </html>
