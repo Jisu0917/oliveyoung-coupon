@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oy-calc-v1';
+const CACHE_NAME = 'oy-calc-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
