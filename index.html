@@ -461,7 +461,17 @@
     previewEl.innerHTML = parsedProducts.map(p => {
       const inBundle = bundleOfId[p.id] !== undefined;
       const unitPrice = Math.round(p.total / p.qty);
-      const detail = p.qty > 1 ? `${unitPrice.toLocaleString('ko-KR')}원 × ${p.qty}개` : `${p.total.toLocaleString('ko-KR')}원`;
+      // 묶음에 포함된 라인은 프로모션으로 가격이 실제로 어떻게 나뉘어 찍혔는지
+      // 알 수 없으므로(평균 단가는 허상일 수 있음), 나눗셈 없이 원래 합계와
+      // 개수를 그대로 보여준다. 묶이지 않은 일반 라인은 기존처럼 평균 단가를 보여준다.
+      let detail;
+      if(p.qty > 1){
+        detail = inBundle
+          ? `${p.total.toLocaleString('ko-KR')}원 (${p.qty}개)`
+          : `${unitPrice.toLocaleString('ko-KR')}원 × ${p.qty}개`;
+      } else {
+        detail = `${p.total.toLocaleString('ko-KR')}원`;
+      }
       return `
         <div class="prod-row${inBundle ? ' in-bundle' : ''}">
           <input type="checkbox" class="bundle-chk" data-id="${p.id}"
