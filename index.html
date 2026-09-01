@@ -147,6 +147,37 @@
     background:var(--danger-pale); padding:8px 10px; border-radius:8px;
   }
 
+  .coupon-group-label{
+    font-size:11.5px; font-weight:700; color:var(--pink-deep);
+    margin:14px 0 6px; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .coupon-group-label:first-child{ margin-top:2px; }
+  .coupon-row{
+    display:flex; align-items:center; gap:8px;
+    background:#fff; border:1px solid var(--line); border-radius:9px;
+    padding:9px 10px; margin-bottom:6px;
+  }
+  .coupon-row input[type="checkbox"]{ flex-shrink:0; width:17px; height:17px; accent-color:var(--pink); }
+  .coupon-label{ flex:1; font-size:12.5px; color:var(--ink); line-height:1.4; }
+  .coupon-off{ font-family:var(--mono); font-size:12.5px; font-weight:700; color:var(--gold); flex-shrink:0; }
+  .coupon-del{
+    border:none; background:var(--danger-pale); color:var(--danger);
+    width:22px; height:22px; border-radius:7px; font-size:12px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .coupon-empty{ font-size:12.5px; color:var(--ink-soft); padding:6px 2px; }
+
+  .custom-coupon-form{
+    margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);
+  }
+  .ccf-title{ font-size:12.5px; font-weight:700; color:var(--pink-deep); margin-bottom:8px; }
+  .custom-coupon-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .custom-coupon-row input{
+    width:64px; border:1px solid var(--line); border-radius:9px;
+    padding:9px 10px; font-family:var(--mono); font-size:14px; background:#fff; text-align:center;
+  }
+  .ccf-label{ font-size:12.5px; color:var(--ink-soft); flex-shrink:0; }
+
   .btn{
     border:none; border-radius:10px; padding:11px 14px;
     font-size:13.5px; font-weight:600; font-family:var(--sans);
@@ -335,6 +366,24 @@
         <input type="checkbox" id="saleToggle" checked>
         <span class="slider"></span>
       </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">4</span>사용 가능한 쿠폰 확인</h2>
+    <p class="sub" style="margin-bottom:10px;">고객이 이미 사용한 쿠폰이 있으면 체크를 해제하세요. 위 목록에 없는 쿠폰(직접 받은 쿠폰 등)은 아래에서 직접 추가할 수 있어요.</p>
+    <div id="couponChecklist"></div>
+
+    <div class="custom-coupon-form">
+      <div class="ccf-title">쿠폰 수기 입력</div>
+      <div class="custom-coupon-row">
+        <input type="tel" inputmode="decimal" id="customThreshold" placeholder="9">
+        <span class="ccf-label">만원 이상</span>
+        <input type="tel" inputmode="decimal" id="customDiscount" placeholder="5">
+        <span class="ccf-label">천원 할인</span>
+      </div>
+      <button class="btn btn-add" id="addCustomCouponBtn" style="width:100%; margin-top:10px;">쿠폰 추가</button>
+      <div class="bundle-err" id="customCouponErr" style="display:none;"></div>
     </div>
   </div>
 
@@ -570,6 +619,8 @@
     document.querySelectorAll('#tierPills .pill').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     currentTier = btn.dataset.tier;
+    disabledMemIdx.clear();
+    renderCouponChecklist();
   });
 
   renderPreview();
@@ -685,10 +736,7 @@
     return items;
   }
 
-  function optimize(itemArr, tier, saleEnabled){
-    const saleList = (saleEnabled ? SALE_COUPONS : []).map(c => ({ ...c, kind:'sale' }));
-    const memList = (MEMBERSHIP_COUPONS[tier] || []).map(c => ({ ...c, kind:'mem' }));
-    const allCoupons = saleList.concat(memList);
+  function optimize(itemArr, allCoupons){
     const totalSum = itemArr.reduce((s,it)=> s + it.price, 0);
     const allCombos = buildCombos(allCoupons);
 
@@ -784,6 +832,112 @@
     return best;
   }
 
+  // ---------- coupon checklist (already-used coupon removal + manual add) ----------
+  const disabledSaleIdx = new Set();
+  const disabledMemIdx = new Set();
+  let customCoupons = []; // {id, threshold, discount, checked}
+  let customIdSeq = 1;
+
+  function renderCouponChecklist(){
+    const el = document.getElementById('couponChecklist');
+    if(!el) return;
+    let html = '';
+
+    if(document.getElementById('saleToggle').checked){
+      html += '<div class="coupon-group-label">올영세일 쿠폰팩</div>';
+      SALE_COUPONS.forEach((c,i)=>{
+        const checked = !disabledSaleIdx.has(i);
+        html += `<div class="coupon-row">
+          <input type="checkbox" class="coupon-chk" data-kind="sale" data-idx="${i}" ${checked?'checked':''}>
+          <span class="coupon-label">${c.label}</span>
+          <span class="coupon-off">-${c.discount.toLocaleString('ko-KR')}원</span>
+        </div>`;
+      });
+    }
+
+    const memList = MEMBERSHIP_COUPONS[currentTier] || [];
+    if(memList.length){
+      html += `<div class="coupon-group-label">멤버십 쿠폰 · ${currentTier}</div>`;
+      memList.forEach((c,i)=>{
+        const checked = !disabledMemIdx.has(i);
+        html += `<div class="coupon-row">
+          <input type="checkbox" class="coupon-chk" data-kind="mem" data-idx="${i}" ${checked?'checked':''}>
+          <span class="coupon-label">${c.label}</span>
+          <span class="coupon-off">-${c.discount.toLocaleString('ko-KR')}원</span>
+        </div>`;
+      });
+    }
+
+    if(customCoupons.length){
+      html += '<div class="coupon-group-label">직접 입력한 쿠폰</div>';
+      customCoupons.forEach(c=>{
+        html += `<div class="coupon-row">
+          <input type="checkbox" class="coupon-chk" data-kind="custom" data-id="${c.id}" ${c.checked?'checked':''}>
+          <span class="coupon-label">${(c.threshold/10000).toLocaleString('ko-KR')}만원 이상 ${(c.discount/1000).toLocaleString('ko-KR')}천원 할인</span>
+          <span class="coupon-off">-${c.discount.toLocaleString('ko-KR')}원</span>
+          <button class="coupon-del" data-id="${c.id}" aria-label="삭제">✕</button>
+        </div>`;
+      });
+    }
+
+    if(!html){
+      html = '<div class="coupon-empty">사용 가능한 쿠폰이 없어요.</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  document.getElementById('saleToggle').addEventListener('change', renderCouponChecklist);
+
+  document.getElementById('couponChecklist').addEventListener('change', (e)=>{
+    const chk = e.target.closest('.coupon-chk');
+    if(!chk) return;
+    const kind = chk.dataset.kind;
+    if(kind === 'sale'){
+      const idx = parseInt(chk.dataset.idx, 10);
+      if(chk.checked) disabledSaleIdx.delete(idx); else disabledSaleIdx.add(idx);
+    } else if(kind === 'mem'){
+      const idx = parseInt(chk.dataset.idx, 10);
+      if(chk.checked) disabledMemIdx.delete(idx); else disabledMemIdx.add(idx);
+    } else if(kind === 'custom'){
+      const id = parseInt(chk.dataset.id, 10);
+      const c = customCoupons.find(x=>x.id===id);
+      if(c) c.checked = chk.checked;
+    }
+  });
+
+  document.getElementById('couponChecklist').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.coupon-del');
+    if(!btn) return;
+    const id = parseInt(btn.dataset.id, 10);
+    customCoupons = customCoupons.filter(c => c.id !== id);
+    renderCouponChecklist();
+  });
+
+  document.getElementById('addCustomCouponBtn').addEventListener('click', ()=>{
+    const errEl = document.getElementById('customCouponErr');
+    errEl.style.display = 'none';
+    const manwonRaw = document.getElementById('customThreshold').value.trim();
+    const cheonwonRaw = document.getElementById('customDiscount').value.trim();
+    const manwon = parseFloat(manwonRaw);
+    const cheonwon = parseFloat(cheonwonRaw);
+    if(!manwonRaw || !cheonwonRaw || isNaN(manwon) || isNaN(cheonwon) || manwon <= 0 || cheonwon <= 0){
+      errEl.textContent = "금액을 올바르게 입력해주세요 (예: 9만원 이상 5천원 할인 → 9, 5)";
+      errEl.style.display = 'block';
+      return;
+    }
+    customCoupons.push({
+      id: customIdSeq++,
+      threshold: Math.round(manwon * 10000),
+      discount: Math.round(cheonwon * 1000),
+      checked: true
+    });
+    document.getElementById('customThreshold').value = '';
+    document.getElementById('customDiscount').value = '';
+    renderCouponChecklist();
+  });
+
+  renderCouponChecklist();
+
   // ---------- run + render ----------
   const errBox = document.getElementById('errBox');
   const resultEl = document.getElementById('result');
@@ -804,14 +958,29 @@
     }
 
     const assignable = buildAssignableItems(parsedProducts, bundles);
+
     const saleEnabled = document.getElementById('saleToggle').checked;
-    const res = optimize(assignable, currentTier, saleEnabled);
+    const saleList = (saleEnabled ? SALE_COUPONS : [])
+      .filter((c,i)=> !disabledSaleIdx.has(i))
+      .map(c => ({ ...c, kind:'sale' }));
+    const memList = (MEMBERSHIP_COUPONS[currentTier] || [])
+      .filter((c,i)=> !disabledMemIdx.has(i))
+      .map(c => ({ ...c, kind:'mem' }));
+    const customList = customCoupons
+      .filter(c => c.checked)
+      .map(c => ({
+        threshold: c.threshold, discount: c.discount, kind:'custom',
+        label: `${(c.threshold/10000).toLocaleString('ko-KR')}만원 이상 ${(c.discount/1000).toLocaleString('ko-KR')}천원 할인`
+      }));
+    const allCoupons = saleList.concat(memList, customList);
+
+    const res = optimize(assignable, allCoupons);
     renderResult(res, assignable);
   });
 
   function couponLabelFor(c){
     if(!c) return null;
-    const src = c.kind === 'sale' ? '올영세일' : `멤버십 · ${currentTier}`;
+    const src = c.kind === 'sale' ? '올영세일' : c.kind === 'custom' ? '직접입력' : `멤버십 · ${currentTier}`;
     return `[${src}] ${c.label}`;
   }
 
