@@ -201,6 +201,10 @@
   }
   .total-line .lbl{font-size:13px; color:var(--ink-soft);}
   .total-line .val{font-family:var(--mono); font-size:19px; font-weight:700; color:var(--pink-deep);}
+  .total-line-sub{margin-top:6px; padding-top:0; border-top:none;}
+  .total-line-sub .lbl{font-size:12px;}
+  .total-line-sub .lbl-note{font-size:10.5px; color:var(--ink-soft); opacity:.8;}
+  .total-line-sub .val-sub{font-size:14px; color:var(--gold);}
 
   /* membership pills */
   .pillrow{display:flex; flex-wrap:wrap; gap:8px;}
@@ -301,6 +305,15 @@
   .summary .val{font-family:var(--mono); font-weight:700;}
   .summary .val.off{color:var(--gold);}
 
+  .upsell{
+    display:flex; align-items:flex-start; gap:8px;
+    margin-top:14px; padding:12px 14px;
+    background:var(--pink-pale); border-radius:10px;
+    font-size:12.5px; color:var(--pink-deep); line-height:1.5;
+  }
+  .upsell .bow-ico{ flex-shrink:0; margin-top:2px; }
+  .upsell b{ font-weight:800; }
+
   .note{font-size:11.5px; color:var(--ink-soft); line-height:1.6; margin-top:10px; text-align:center;}
   .cache-btn{
     display:block; margin:14px auto 0; padding:8px 14px;
@@ -338,6 +351,10 @@
     <div class="total-line">
       <span class="lbl">현재 합계</span>
       <span class="val" id="totalSum">0원</span>
+    </div>
+    <div class="total-line total-line-sub" id="eligibleTotalRow" style="display:none;">
+      <span class="lbl">쿠폰 기준 합계 <span class="lbl-note">(제외 상품 빼고)</span></span>
+      <span class="val val-sub" id="eligibleTotal">0원</span>
     </div>
   </div>
 
@@ -511,6 +528,16 @@
   function updateTotalDisplay(){
     const total = parsedProducts.reduce((s,p)=> s + p.total, 0);
     totalSumEl.textContent = fmt(total);
+
+    const hasExcluded = parsedProducts.some(p => p.excluded);
+    const eligibleRow = document.getElementById('eligibleTotalRow');
+    if(hasExcluded){
+      const eligible = parsedProducts.reduce((s,p)=> s + (p.excluded ? 0 : p.total), 0);
+      document.getElementById('eligibleTotal').textContent = fmt(eligible);
+      eligibleRow.style.display = 'flex';
+    } else {
+      eligibleRow.style.display = 'none';
+    }
   }
 
   function renderPreview(){
@@ -764,6 +791,84 @@
     return items;
   }
 
+  // minimum total extra "threshold-eligible" money that would need to be
+  // added (in the best-case hypothetical split) for every bin's requirement
+  // to be met. 0 means the bins are already satisfiable with what's on hand.
+  function minimizeShortfall(items, bins){
+    if(bins.length === 0) return 0;
+    const sorted = [...items].sort((a,b)=> b.tval - a.tval);
+    const n = sorted.length;
+    const suffix = new Array(n+1).fill(0);
+    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].tval;
+
+    const state = bins.map(b => ({ required: b.required, tval: 0 }));
+    let best = Infinity;
+    let budget = 300000;
+
+    function deficitSum(){
+      let d = 0;
+      for(const b of state) d += Math.max(b.required - b.tval, 0);
+      return d;
+    }
+
+    function rec(i){
+      budget--;
+      if(budget <= 0) return;
+      if(i === n){
+        const fs = deficitSum();
+        if(fs < best) best = fs;
+        return;
+      }
+      const lb = Math.max(0, deficitSum() - suffix[i]);
+      if(lb >= best) return;
+
+      const order = state.map((b,idx)=>idx)
+        .sort((x,y)=> (state[y].required-state[y].tval) - (state[x].required-state[x].tval));
+      const seen = new Set();
+      for(const j of order){
+        const key = state[j].required + '|' + state[j].tval;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        state[j].tval += sorted[i].tval;
+        rec(i+1);
+        state[j].tval -= sorted[i].tval;
+      }
+    }
+
+    rec(0);
+    return best === Infinity ? deficitSum() : best;
+  }
+
+  // among coupon combos that would give MORE discount than what was actually
+  // achieved, find the one that needs the smallest extra purchase to become
+  // usable — this is what powers the "buy X more to unlock a bigger coupon"
+  // hint. Quick lower bounds narrow down candidates before running the
+  // (more expensive) exact shortfall search on just a handful of them.
+  function findUpsell(itemArr, allCoupons, currentDiscount){
+    const totalEligible = itemArr.reduce((s,it)=> s + it.tval, 0);
+    const allCombos = buildCombos(allCoupons).filter(c => c.discount > currentDiscount);
+    if(allCombos.length === 0) return null;
+
+    const candidates = allCombos.map(combo => {
+      const bins = buildBins(combo.coupons);
+      const reqSum = bins.reduce((s,b)=> s + b.required, 0);
+      const lb = Math.max(0, reqSum - totalEligible);
+      return { combo, bins, lb };
+    }).filter(c => c.bins.length <= itemArr.length);
+
+    candidates.sort((a,b)=> a.lb - b.lb || b.combo.discount - a.combo.discount);
+    const shortlist = candidates.slice(0, 8);
+
+    let bestPick = null;
+    for(const c of shortlist){
+      const shortfall = minimizeShortfall(itemArr, c.bins);
+      if(shortfall > 0 && (bestPick === null || shortfall < bestPick.shortfall)){
+        bestPick = { shortfall, discount: c.combo.discount };
+      }
+    }
+    return bestPick;
+  }
+
   function optimize(itemArr, allCoupons){
     const totalSum = itemArr.reduce((s,it)=> s + it.price, 0);
     const totalEligible = itemArr.reduce((s,it)=> s + it.tval, 0);
@@ -1006,6 +1111,7 @@
     const allCoupons = saleList.concat(memList, customList);
 
     const res = optimize(assignable, allCoupons);
+    res.upsell = findUpsell(assignable, allCoupons, res.discount);
     renderResult(res, assignable);
   });
 
@@ -1107,6 +1213,13 @@
       <div class="line"><span>총 할인</span><span class="val off">-${res.discount.toLocaleString('ko-KR')}원</span></div>
       <div class="line grand"><span>최종 결제 총액</span><span class="val">${(totalSum-res.discount).toLocaleString('ko-KR')}원</span></div>
     </div>`;
+
+    if(res.upsell){
+      html += `<div class="upsell">
+        <svg class="bow-ico" width="13" height="13" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg>
+        <span><b>${res.upsell.shortfall.toLocaleString('ko-KR')}원</b> 더 구매하면 <b>${res.upsell.discount.toLocaleString('ko-KR')}원</b> 할인(지금보다 +${(res.upsell.discount-res.discount).toLocaleString('ko-KR')}원)도 가능해요.</span>
+      </div>`;
+    }
 
     html += `</div>`;
 
