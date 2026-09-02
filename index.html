@@ -125,6 +125,16 @@
     font-size:10.5px; font-weight:700; color:#9A2F55; background:#FFC7DC;
     padding:2px 7px; border-radius:999px; flex-shrink:0;
   }
+  .prod-exclude-tag{
+    font-size:10.5px; font-weight:700; color:var(--pink-deep); background:var(--pink-pale);
+    padding:2px 7px 2px 5px; border-radius:999px; flex-shrink:0;
+    display:inline-flex; align-items:center; gap:2px;
+  }
+  .line-exclude-tag{
+    font-size:10.5px; font-weight:700; color:var(--pink-deep); background:var(--pink-pale);
+    padding:1px 6px; border-radius:999px;
+  }
+  .prod-row.excluded{ border-style:dashed; }
 
   .opt{font-weight:400; color:var(--ink-soft); font-size:11.5px;}
   .custom-size-input{
@@ -315,7 +325,9 @@
     <div class="hint">
       쉼표(,)로 상품을 구분하세요. 수량이 2개 이상이면 <code>합계금액/수량</code>으로 입력하면 됩니다.<br>
       예) <code>4000/4</code> → 1,000원짜리 상품 4개(합계 4,000원). 숫자 안에는 콤마를 넣지 마세요.<br>
-      포스기에 찍힌 금액을 그대로 입력하세요 — 2+1처럼 무료로 찍힌 상품은 <code>0</code>으로 입력하면 됩니다.
+      포스기에 찍힌 금액을 그대로 입력하세요 — 2+1처럼 무료로 찍힌 상품은 <code>0</code>으로 입력하면 됩니다.<br>
+      쇼핑백·클리어런스 상품처럼 쿠폰 기준 금액에서 제외되는 상품은 금액 뒤에 <code>?</code>를 붙이세요.<br>
+      예) <code>40000?</code> 또는 수량이 있으면 <code>10000/2?</code>(=<code>10000?/2</code>) — 결제 총액에는 포함되지만 쿠폰 구간 계산에서는 빠집니다.
     </div>
     <div class="err" id="parseErrBox" style="display:none;"></div>
 
@@ -455,13 +467,17 @@
     const products = [];
     const errors = [];
     tokens.forEach((tok, i) => {
-      const m = tok.match(/^(\d+)(?:\/(\d+))?$/);
+      // "?" marks a coupon-threshold-excluded item (shopping bag, clearance
+      // item, etc). It can appear right after the amount or at the very end,
+      // so both "40000?" and "10000?/2" / "10000/2?" are accepted.
+      const m = tok.match(/^(\d+)(\?)?(?:\/(\d+))?(\?)?$/);
       if(!m){
         errors.push(`${i+1}번째 입력값 "${tok}"을(를) 인식할 수 없어요.`);
         return;
       }
       const total = parseInt(m[1], 10);
-      const qty = m[2] ? parseInt(m[2], 10) : 1;
+      const qty = m[3] ? parseInt(m[3], 10) : 1;
+      const excluded = !!(m[2] || m[4]);
       if(total < 0 || qty <= 0){
         errors.push(`${i+1}번째 입력값이 올바르지 않아요.`);
         return;
@@ -470,7 +486,7 @@
       const rem = total - base*qty;
       const units = [];
       for(let k=0;k<qty;k++) units.push(k < rem ? base+1 : base);
-      products.push({ id: i+1, total, qty, units });
+      products.push({ id: i+1, total, qty, units, excluded });
     });
     return { products, errors };
   }
@@ -522,12 +538,13 @@
         detail = `${p.total.toLocaleString('ko-KR')}원`;
       }
       return `
-        <div class="prod-row${inBundle ? ' in-bundle' : ''}">
+        <div class="prod-row${inBundle ? ' in-bundle' : ''}${p.excluded ? ' excluded' : ''}">
           <input type="checkbox" class="bundle-chk" data-id="${p.id}"
             ${inBundle ? 'disabled' : ''} ${selectedIds.has(p.id) ? 'checked' : ''}>
           <span class="prod-idx">${p.id}번</span>
           <span class="prod-detail">${detail}</span>
           <span class="prod-sum">${p.total.toLocaleString('ko-KR')}원</span>
+          ${p.excluded ? `<span class="prod-exclude-tag" title="쿠폰 기준 금액에서 제외"><svg width="11" height="11" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg>제외</span>` : ''}
           ${inBundle ? `<span class="prod-bundle-tag">묶음${bundleOfId[p.id]+1}</span>` : ''}
         </div>`;
     }).join('');
@@ -643,7 +660,10 @@
   function buildCombos(allCoupons){
     const subsets = subsetsOf(allCoupons);
     const all = subsets.map(s => ({ coupons: s, discount: sumDiscount(s) }));
-    all.sort((a,b)=> b.discount - a.discount);
+    // when two combos give the same discount, prefer the one using fewer
+    // coupons — fewer coupons means fewer baskets, so we never split
+    // payment into more transactions than necessary for the same discount.
+    all.sort((a,b)=> b.discount - a.discount || a.coupons.length - b.coupons.length);
     return all;
   }
 
@@ -653,39 +673,44 @@
       .map(c => ({ required: c.threshold, coupon: c }));
   }
 
-  // exact backtracking bin-covering partition (all items must be placed)
+  // exact backtracking bin-covering partition (all items must be placed).
+  // feasibility is checked against each item's threshold-eligible value
+  // (tval) — excluded items (shopping bags, clearance) contribute 0 here —
+  // while `sum` keeps tracking the real amount actually being paid.
   function findPartition(itemArr, bins){
     if(bins.length === 0) return null;
-    const sorted = [...itemArr].sort((a,b)=> b.price - a.price);
+    const sorted = [...itemArr].sort((a,b)=> b.tval - a.tval);
     const n = sorted.length;
     const suffix = new Array(n+1).fill(0);
-    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].price;
+    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].tval;
 
-    const state = bins.map(b => ({ required: b.required, sum: 0, list: [], coupon: b.coupon }));
+    const state = bins.map(b => ({ required: b.required, sum: 0, tval: 0, list: [], coupon: b.coupon }));
     let budget = 220000;
 
     function rec(i){
       budget--;
       if(budget <= 0) return false;
       if(i === n){
-        return state.every(b => b.sum >= b.required);
+        return state.every(b => b.tval >= b.required);
       }
       let deficit = 0;
-      for(const b of state) deficit += Math.max(b.required - b.sum, 0);
+      for(const b of state) deficit += Math.max(b.required - b.tval, 0);
       if(deficit > suffix[i]) return false;
 
       const order = state.map((b,idx)=>idx)
-        .sort((x,y)=> (state[y].required-state[y].sum) - (state[x].required-state[x].sum));
+        .sort((x,y)=> (state[y].required-state[y].tval) - (state[x].required-state[x].tval));
 
       const seen = new Set();
       for(const j of order){
-        const key = state[j].required + '|' + state[j].sum;
+        const key = state[j].required + '|' + state[j].tval;
         if(seen.has(key)) continue;
         seen.add(key);
         state[j].sum += sorted[i].price;
+        state[j].tval += sorted[i].tval;
         state[j].list.push(sorted[i]);
         if(rec(i+1)) return true;
         state[j].sum -= sorted[i].price;
+        state[j].tval -= sorted[i].tval;
         state[j].list.pop();
       }
       return false;
@@ -703,34 +728,37 @@
   // assignable, same as normal products.
   function buildAssignableItems(products, bundleDefs){
     const pool = {};
-    products.forEach(p => pool[p.id] = [...p.units]);
+    products.forEach(p => {
+      pool[p.id] = p.units.map(price => ({ price, tval: p.excluded ? 0 : price }));
+    });
     const items = [];
 
     bundleDefs.forEach(b => {
       const combined = [];
       b.memberIds.forEach(pid => {
-        (pool[pid] || []).forEach(price => combined.push({ price, productId: pid }));
+        (pool[pid] || []).forEach(u => combined.push({ price: u.price, tval: u.tval, productId: pid }));
       });
       const numSets = Math.floor(combined.length / b.setSize);
       let idx = 0;
       for(let s=0; s<numSets; s++){
-        let setValue = 0;
+        let setValue = 0, setTval = 0;
         const membersUsed = new Set();
         for(let k=0; k<b.setSize; k++){
           setValue += combined[idx].price;
+          setTval += combined[idx].tval;
           membersUsed.add(combined[idx].productId);
           idx++;
         }
-        items.push({ price: setValue, kind:'bundle', bundleId: b.id, setSize: b.setSize, memberIds:[...membersUsed] });
+        items.push({ price: setValue, tval: setTval, kind:'bundle', bundleId: b.id, setSize: b.setSize, memberIds:[...membersUsed] });
       }
       for(; idx<combined.length; idx++){
-        items.push({ price: combined[idx].price, kind:'unit', productId: combined[idx].productId });
+        items.push({ price: combined[idx].price, tval: combined[idx].tval, kind:'unit', productId: combined[idx].productId });
       }
       b.memberIds.forEach(pid => pool[pid] = []);
     });
 
     products.forEach(p => {
-      (pool[p.id] || []).forEach(price => items.push({ price, kind:'unit', productId: p.id }));
+      (pool[p.id] || []).forEach(u => items.push({ price: u.price, tval: u.tval, kind:'unit', productId: p.id }));
     });
 
     return items;
@@ -738,6 +766,7 @@
 
   function optimize(itemArr, allCoupons){
     const totalSum = itemArr.reduce((s,it)=> s + it.price, 0);
+    const totalEligible = itemArr.reduce((s,it)=> s + it.tval, 0);
     const allCombos = buildCombos(allCoupons);
 
     for(const combo of allCombos){
@@ -746,7 +775,7 @@
       }
       const bins = buildBins(combo.coupons);
       const reqSum = bins.reduce((s,b)=> s + b.required, 0);
-      if(reqSum > totalSum) continue;
+      if(reqSum > totalEligible) continue;
       if(bins.length > itemArr.length) continue;
 
       const feasible = findPartition(itemArr, bins);
@@ -768,12 +797,12 @@
   // other basket still reaches its own coupon threshold using as few items
   // as possible. Runs once per candidate main bin; the caller keeps the best.
   function minimizeMovedForMain(items, bins, mainIdx){
-    const sorted = [...items].sort((a,b)=> b.price - a.price);
+    const sorted = [...items].sort((a,b)=> b.tval - a.tval);
     const n = sorted.length;
     const suffix = new Array(n+1).fill(0);
-    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].price;
+    for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].tval;
 
-    const state = bins.map((b,i)=> ({ required:b.required, sum:0, list:[], coupon:b.coupon, isMain: i===mainIdx }));
+    const state = bins.map((b,i)=> ({ required:b.required, sum:0, tval:0, list:[], coupon:b.coupon, isMain: i===mainIdx }));
     let bestMoved = Infinity;
     let bestSnapshot = null;
     let budget = 500000;
@@ -783,30 +812,32 @@
       if(budget <= 0) return;
       if(moved >= bestMoved) return; // can't improve on the best found so far
       if(i === n){
-        if(state.every(b => b.sum >= b.required)){
+        if(state.every(b => b.tval >= b.required)){
           bestMoved = moved;
           bestSnapshot = state.map(b => ({ items:[...b.list], sum:b.sum, coupon:b.coupon }));
         }
         return;
       }
       let deficit = 0;
-      for(const b of state) deficit += Math.max(b.required - b.sum, 0);
+      for(const b of state) deficit += Math.max(b.required - b.tval, 0);
       if(deficit > suffix[i]) return;
 
       // try the main basket first (keeps it big fast, tightens pruning sooner)
       const order = state.map((b,idx)=>idx).sort((x,y)=>{
         if(state[x].isMain !== state[y].isMain) return state[x].isMain ? -1 : 1;
-        return (state[y].required-state[y].sum) - (state[x].required-state[x].sum);
+        return (state[y].required-state[y].tval) - (state[x].required-state[x].tval);
       });
       const seen = new Set();
       for(const j of order){
-        const key = state[j].required + '|' + state[j].sum + '|' + state[j].isMain;
+        const key = state[j].required + '|' + state[j].tval + '|' + state[j].isMain;
         if(seen.has(key)) continue;
         seen.add(key);
         state[j].sum += sorted[i].price;
+        state[j].tval += sorted[i].tval;
         state[j].list.push(sorted[i]);
         rec(i+1, moved + (state[j].isMain ? 0 : 1));
         state[j].sum -= sorted[i].price;
+        state[j].tval -= sorted[i].tval;
         state[j].list.pop();
       }
     }
@@ -1045,7 +1076,9 @@
         lines.push(`<b>[묶음 ${typeLabel}]</b> 상품 ${memberStr} 중 ${e.count}세트(${e.count*e.setSize}개) = ${e.sum.toLocaleString('ko-KR')}원`);
       });
       [...units.entries()].sort((a,z)=>a[0]-z[0]).forEach(([pid, e]) => {
-        lines.push(`<b>${pid}번</b> 상품 × ${e.count}개 = ${e.sum.toLocaleString('ko-KR')}원`);
+        const prod = parsedProducts.find(p => p.id === pid);
+        const excludedTag = prod && prod.excluded ? ' <span class="line-exclude-tag">쿠폰제외</span>' : '';
+        lines.push(`<b>${pid}번</b> 상품 × ${e.count}개 = ${e.sum.toLocaleString('ko-KR')}원${excludedTag}`);
       });
 
       const title = K <= 1
