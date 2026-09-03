@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>올영세일 분할결제 쿠폰 계산기</title>
 
 <!-- PWA -->
@@ -43,7 +43,7 @@
     --mono: 'MallangGalmuri', ui-monospace, 'SF Mono', 'Courier New', monospace;
     --sans: 'MallangGalmuri', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation;}
   button, input, textarea, select{font-family:inherit;}
   html,body{margin:0;padding:0;}
   body{
@@ -54,7 +54,7 @@
     min-height:100vh;
     padding:0 0 60px;
   }
-  .wrap{max-width:480px; margin:0 auto; padding:22px 16px 0;}
+  .wrap{max-width:480px; margin:0 auto; padding:calc(26px + env(safe-area-inset-top)) 16px 0;}
 
   header.top{padding:6px 4px 18px;}
   .eyebrow{
@@ -76,6 +76,7 @@
     letter-spacing:-0.01em;
   }
   .sub{font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin:0;}
+  .tagline{font-size:14.5px; color:var(--pink); font-weight:700; margin:0 0 8px;}
 
   .card{
     background:var(--paper);
@@ -110,11 +111,12 @@
   .hint code{font-family:var(--mono); background:var(--paper-2); padding:1px 5px; border-radius:4px;}
 
   /* quick numeric entry pad */
-  .quickpad-toggle-btn{
-    display:block; width:100%; margin-top:10px; padding:10px;
+  .quickpad-ribbon-btn{
+    width:26px; height:26px; border-radius:50%; flex-shrink:0;
     background:var(--pink-pale); color:var(--pink-deep); border:none;
-    border-radius:10px; font-family:var(--sans); font-size:13px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
   }
+  .quickpad-ribbon-btn.active{ background:var(--pink); color:#fff; }
   .quickpad{
     margin-top:10px; padding:14px; border-radius:12px;
     background:var(--paper-2); border:1px solid var(--line);
@@ -364,7 +366,7 @@
 
   /* history FAB + panel */
   .history-fab{
-    position:fixed; top:18px; right:18px; z-index:40;
+    position:fixed; top:calc(20px + env(safe-area-inset-top)); right:18px; z-index:40;
     width:40px; height:40px; border-radius:50%;
     background:var(--paper); color:var(--pink-deep);
     border:1px solid var(--line);
@@ -435,15 +437,19 @@
       </svg>
     </button>
     <div class="eyebrow"><svg class="bow-ico" width="13" height="13" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg>Olive Young · Day 1 Split-Pay</div>
-    <h1>올영세일 분할결제<br>쿠폰 최적화 계산기</h1>
+    <h1>올리브영 분할 결제 계산기</h1>
+    <p class="tagline">- 쿠폰 최대 할인 적용</p>
     <p class="sub">상품 금액을 포스기 순서대로 입력하면, 보유한 쿠폰을 최대한 조합해 몇 번으로 나눠 결제해야 할인이 가장 큰지 계산해드려요.</p>
   </header>
 
   <div class="card">
-    <h2><span class="num">1</span>상품 목록 입력<button id="resetBtn" class="reset-btn" type="button">전체 초기화</button></h2>
+    <h2>
+      <span class="num">1</span>상품 목록 입력<button id="quickPadToggleBtn" class="quickpad-ribbon-btn" type="button" aria-label="빠른 입력 패드 열기">
+        <svg width="15" height="15" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg>
+      </button><button id="resetBtn" class="reset-btn" type="button">전체 초기화</button>
+    </h2>
     <textarea id="productInput" class="product-textarea" placeholder="예) 1000,2000,4000/4,10000/2"></textarea>
 
-    <button id="quickPadToggleBtn" class="quickpad-toggle-btn" type="button">🔢 빠른 입력 패드 열기</button>
     <div id="quickPad" class="quickpad" style="display:none;">
       <div class="quickpad-display">
         <span id="quickPadBuffer" class="quickpad-buffer">입력 대기 중</span>
@@ -1377,7 +1383,7 @@
     quickPadBuffer = '';
     quickPadItems = [];
     document.getElementById('quickPad').style.display = 'none';
-    document.getElementById('quickPadToggleBtn').textContent = '🔢 빠른 입력 패드 열기';
+    document.getElementById('quickPadToggleBtn').classList.remove('active');
   });
 
   // ---------- quick numeric entry pad ----------
@@ -1391,9 +1397,11 @@
 
   document.getElementById('quickPadToggleBtn').addEventListener('click', ()=>{
     const pad = document.getElementById('quickPad');
+    const btn = document.getElementById('quickPadToggleBtn');
     const willOpen = pad.style.display === 'none';
     pad.style.display = willOpen ? 'block' : 'none';
-    document.getElementById('quickPadToggleBtn').textContent = willOpen ? '🔢 빠른 입력 패드 닫기' : '🔢 빠른 입력 패드 열기';
+    btn.classList.toggle('active', willOpen);
+    btn.setAttribute('aria-label', willOpen ? '빠른 입력 패드 닫기' : '빠른 입력 패드 열기');
     if(willOpen){
       quickPadBuffer = '';
       quickPadItems = [];
@@ -1434,7 +1442,8 @@
     quickPadItems = [];
     renderQuickPad();
     document.getElementById('quickPad').style.display = 'none';
-    document.getElementById('quickPadToggleBtn').textContent = '🔢 빠른 입력 패드 열기';
+    document.getElementById('quickPadToggleBtn').classList.remove('active');
+    document.getElementById('quickPadToggleBtn').setAttribute('aria-label', '빠른 입력 패드 열기');
   });
 
   // ---------- run + render ----------
