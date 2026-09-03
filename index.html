@@ -135,20 +135,25 @@
     padding:16px 0; font-size:20px; font-weight:700; color:var(--ink);
     background:#fff; border:1px solid var(--line); border-radius:10px;
     font-family:var(--mono);
+    transition:transform 70ms ease, background 70ms ease;
   }
-  .qp-btn:active{ background:var(--pink-pale); }
+  .qp-btn:active, .qp-btn.pressed{ background:var(--pink-pale); transform:scale(0.92); }
   .qp-btn-sub{ font-size:13px; color:var(--pink-deep); font-family:var(--sans); }
   .quickpad-actions{ display:flex; gap:8px; margin-top:8px; }
   .qp-action-btn{
     flex:1; padding:13px 0; border-radius:10px; border:1px solid var(--line);
     background:#fff; color:var(--ink-soft); font-family:var(--sans); font-size:13px; font-weight:600;
+    transition:transform 70ms ease;
   }
+  .qp-action-btn.pressed{ transform:scale(0.95); }
   .qp-action-primary{ background:var(--pink); color:#fff; border-color:var(--pink); }
   .qp-done-btn{
     display:block; width:100%; margin-top:8px; padding:13px 0;
     background:var(--pink-deep); color:#fff; border:none; border-radius:10px;
     font-family:var(--sans); font-size:14px; font-weight:800;
+    transition:transform 70ms ease;
   }
+  .qp-done-btn.pressed{ transform:scale(0.97); }
   .quickpad-hint{ font-size:11px; color:var(--ink-soft); line-height:1.5; margin:10px 2px 0; }
 
   .preview-list{margin-top:14px; display:flex; flex-direction:column; gap:6px;}
@@ -1388,6 +1393,38 @@
   // ---------- quick numeric entry pad ----------
   let quickPadBuffer = '';
 
+  // tiny synthesized click sound — works on iPhone Safari (unlike vibration,
+  // which iOS Safari does not expose to web pages at all). Created lazily
+  // inside a click handler so it satisfies iOS's user-gesture audio policy.
+  let qpAudioCtx = null;
+  function qpPlayTone(freq, duration){
+    try{
+      if(!qpAudioCtx) qpAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if(qpAudioCtx.state === 'suspended') qpAudioCtx.resume();
+      const osc = qpAudioCtx.createOscillator();
+      const gain = qpAudioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.07, qpAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, qpAudioCtx.currentTime + duration);
+      osc.connect(gain).connect(qpAudioCtx.destination);
+      osc.start();
+      osc.stop(qpAudioCtx.currentTime + duration);
+    } catch(e){ /* Web Audio unavailable — fail silently */ }
+  }
+  function qpFeedback(el, kind){
+    // sound (all platforms that support it, incl. iPhone Safari)
+    if(kind === 'digit') qpPlayTone(720, 0.045);
+    else if(kind === 'backspace') qpPlayTone(320, 0.06);
+    else qpPlayTone(980, 0.07); // 다음 상품 / 패드 닫기
+    // best-effort haptic — silently does nothing on iOS Safari, works on
+    // some Android browsers
+    if(navigator.vibrate) navigator.vibrate(kind === 'digit' ? 8 : 14);
+    // visual press flash, so feedback is visible even on a very quick tap
+    el.classList.add('pressed');
+    setTimeout(()=> el.classList.remove('pressed'), 110);
+  }
+
   function renderQuickPad(){
     document.getElementById('quickPadBuffer').textContent = quickPadBuffer || '입력 대기 중';
     document.getElementById('quickPadCount').textContent = `현재 목록 ${parsedProducts.length}개`;
@@ -1410,12 +1447,14 @@
     btn.addEventListener('click', ()=>{
       quickPadBuffer += btn.dataset.key;
       renderQuickPad();
+      qpFeedback(btn, 'digit');
     });
   });
 
-  document.getElementById('qpBackspace').addEventListener('click', ()=>{
+  document.getElementById('qpBackspace').addEventListener('click', (e)=>{
     quickPadBuffer = quickPadBuffer.slice(0, -1);
     renderQuickPad();
+    qpFeedback(e.currentTarget, 'backspace');
   });
 
   function commitQuickPadBuffer(){
@@ -1427,9 +1466,13 @@
     renderQuickPad();
   }
 
-  document.getElementById('qpNext').addEventListener('click', commitQuickPadBuffer);
+  document.getElementById('qpNext').addEventListener('click', (e)=>{
+    qpFeedback(e.currentTarget, 'confirm');
+    commitQuickPadBuffer();
+  });
 
-  document.getElementById('qpDone').addEventListener('click', ()=>{
+  document.getElementById('qpDone').addEventListener('click', (e)=>{
+    qpFeedback(e.currentTarget, 'confirm');
     commitQuickPadBuffer();
     document.getElementById('quickPad').style.display = 'none';
     document.getElementById('quickPadToggleBtn').classList.remove('active');
