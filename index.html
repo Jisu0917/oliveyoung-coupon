@@ -54,7 +54,7 @@
     min-height:100vh;
     padding:0 0 60px;
   }
-  .wrap{max-width:480px; margin:0 auto; padding:calc(26px + env(safe-area-inset-top)) 16px 0;}
+  .wrap{max-width:480px; margin:0 auto; padding:calc(8px + env(safe-area-inset-top)) 16px 0;}
 
   header.top{padding:6px 4px 18px;}
   .eyebrow{
@@ -366,7 +366,7 @@
 
   /* history FAB + panel */
   .history-fab{
-    position:fixed; top:calc(20px + env(safe-area-inset-top)); right:18px; z-index:40;
+    position:fixed; top:calc(10px + env(safe-area-inset-top)); right:18px; z-index:40;
     width:40px; height:40px; border-radius:50%;
     background:var(--paper); color:var(--pink-deep);
     border:1px solid var(--line);
@@ -473,8 +473,8 @@
         <button id="qpBackspace" class="qp-action-btn" type="button">⌫ 한 글자 지우기</button>
         <button id="qpNext" class="qp-action-btn qp-action-primary" type="button">다음 상품 ✓</button>
       </div>
-      <button id="qpDone" class="qp-done-btn" type="button">입력 완료 · 목록에 반영</button>
-      <p class="quickpad-hint">숫자 입력 후 “다음 상품”을 눌러 하나씩 확정하세요. 수량은 <b>/</b>, 쇼핑백·클리어런스 제외 표시는 <b>?</b> 버튼을 쓰면 됩니다.</p>
+      <button id="qpDone" class="qp-done-btn" type="button">패드 닫기</button>
+      <p class="quickpad-hint">숫자 입력 후 “다음 상품”을 누르면 바로 위 입력칸에 반영돼요. 수량은 <b>/</b>, 쇼핑백·클리어런스 제외 표시는 <b>?</b> 버튼을 쓰면 됩니다.</p>
     </div>
 
     <div class="hint">
@@ -1381,18 +1381,16 @@
     bundleErrBoxEl.style.display = 'none';
 
     quickPadBuffer = '';
-    quickPadItems = [];
     document.getElementById('quickPad').style.display = 'none';
     document.getElementById('quickPadToggleBtn').classList.remove('active');
   });
 
   // ---------- quick numeric entry pad ----------
   let quickPadBuffer = '';
-  let quickPadItems = [];
 
   function renderQuickPad(){
     document.getElementById('quickPadBuffer').textContent = quickPadBuffer || '입력 대기 중';
-    document.getElementById('quickPadCount').textContent = `${quickPadItems.length}개 입력됨`;
+    document.getElementById('quickPadCount').textContent = `현재 목록 ${parsedProducts.length}개`;
   }
 
   document.getElementById('quickPadToggleBtn').addEventListener('click', ()=>{
@@ -1404,7 +1402,6 @@
     btn.setAttribute('aria-label', willOpen ? '빠른 입력 패드 닫기' : '빠른 입력 패드 열기');
     if(willOpen){
       quickPadBuffer = '';
-      quickPadItems = [];
       renderQuickPad();
     }
   });
@@ -1421,26 +1418,19 @@
     renderQuickPad();
   });
 
-  document.getElementById('qpNext').addEventListener('click', ()=>{
+  function commitQuickPadBuffer(){
     if(quickPadBuffer.length === 0) return;
-    quickPadItems.push(quickPadBuffer);
+    const existing = productInputEl.value.trim();
+    productInputEl.value = existing ? (existing + ',' + quickPadBuffer) : quickPadBuffer;
+    productInputEl.dispatchEvent(new Event('input'));
     quickPadBuffer = '';
     renderQuickPad();
-  });
+  }
+
+  document.getElementById('qpNext').addEventListener('click', commitQuickPadBuffer);
 
   document.getElementById('qpDone').addEventListener('click', ()=>{
-    if(quickPadBuffer.length > 0){
-      quickPadItems.push(quickPadBuffer);
-      quickPadBuffer = '';
-    }
-    if(quickPadItems.length > 0){
-      const newText = quickPadItems.join(',');
-      const existing = productInputEl.value.trim();
-      productInputEl.value = existing ? (existing + ',' + newText) : newText;
-      productInputEl.dispatchEvent(new Event('input'));
-    }
-    quickPadItems = [];
-    renderQuickPad();
+    commitQuickPadBuffer();
     document.getElementById('quickPad').style.display = 'none';
     document.getElementById('quickPadToggleBtn').classList.remove('active');
     document.getElementById('quickPadToggleBtn').setAttribute('aria-label', '빠른 입력 패드 열기');
