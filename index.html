@@ -366,7 +366,11 @@
     border:1px solid var(--line); border-radius:12px; padding:11px 12px;
     background:#fff; display:flex; align-items:center; gap:10px;
   }
-  .history-item-main{ flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; }
+  .history-item-main{
+    flex:1; min-width:0; text-align:left; background:none; border:none; padding:0;
+    display:block; width:100%; font-family:inherit; cursor:pointer;
+    -webkit-appearance:none; appearance:none;
+  }
   .history-item-time{ font-size:10.5px; color:var(--ink-soft); font-family:var(--mono); }
   .history-item-summary{ font-size:13px; color:var(--ink); font-weight:600; margin-top:2px; }
   .history-item-detail{ font-size:11px; color:var(--ink-soft); margin-top:2px; font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -866,36 +870,47 @@
     return items;
   }
 
-  // minimum total extra "threshold-eligible" money that would need to be
-  // added (in the best-case hypothetical split) for every bin's requirement
-  // to be met. 0 means the bins are already satisfiable with what's on hand.
-  function minimizeShortfall(items, bins){
-    if(bins.length === 0) return 0;
+  // minimum extra "threshold-eligible" money needed in ONE basket (the kind
+  // a single additional purchase would land in) so this coupon combo becomes
+  // usable, given every OTHER basket must already be satisfiable from what's
+  // on hand. Tries each basket as the one that would receive the top-up and
+  // keeps the cheapest option. Returns 0 if already feasible as-is.
+  function minimizeShortfallForTarget(items, bins, targetIdx){
     const sorted = [...items].sort((a,b)=> b.tval - a.tval);
     const n = sorted.length;
     const suffix = new Array(n+1).fill(0);
     for(let i=n-1;i>=0;i--) suffix[i] = suffix[i+1] + sorted[i].tval;
 
-    const state = bins.map(b => ({ required: b.required, tval: 0 }));
+    const state = bins.map((b,i)=> ({ required: b.required, tval: 0, isTarget: i === targetIdx }));
     let best = Infinity;
-    let budget = 300000;
+    let budget = 200000;
 
-    function deficitSum(){
+    function nonTargetDeficit(){
       let d = 0;
-      for(const b of state) d += Math.max(b.required - b.tval, 0);
+      for(const b of state) if(!b.isTarget) d += Math.max(b.required - b.tval, 0);
       return d;
     }
 
     function rec(i){
       budget--;
       if(budget <= 0) return;
+      const remaining = suffix[i];
+      const ntDeficit = nonTargetDeficit();
+      if(ntDeficit > remaining) return; // other baskets can no longer be satisfied at all
+
+      const target = state[targetIdx];
+      const targetDeficitNow = Math.max(0, target.required - target.tval);
+      const leftoverForTarget = Math.max(0, remaining - ntDeficit);
+      const lb = Math.max(0, targetDeficitNow - leftoverForTarget);
+      if(lb >= best) return;
+
       if(i === n){
-        const fs = deficitSum();
-        if(fs < best) best = fs;
+        if(ntDeficit === 0){
+          const fd = Math.max(0, target.required - target.tval);
+          if(fd < best) best = fd;
+        }
         return;
       }
-      const lb = Math.max(0, deficitSum() - suffix[i]);
-      if(lb >= best) return;
 
       const order = state.map((b,idx)=>idx)
         .sort((x,y)=> (state[y].required-state[y].tval) - (state[x].required-state[x].tval));
@@ -911,7 +926,17 @@
     }
 
     rec(0);
-    return best === Infinity ? deficitSum() : best;
+    return best;
+  }
+
+  function minimizeShortfall(items, bins){
+    if(bins.length === 0) return 0;
+    let best = Infinity;
+    for(let t=0; t<bins.length; t++){
+      const s = minimizeShortfallForTarget(items, bins, t);
+      if(s < best) best = s;
+    }
+    return best;
   }
 
   // among coupon combos that would give MORE discount than what was actually
