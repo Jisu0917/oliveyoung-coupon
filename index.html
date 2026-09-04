@@ -387,6 +387,15 @@
   }
   .reset-btn:active{ background:var(--danger-pale); color:var(--danger); border-color:var(--danger-pale); }
 
+  .help-toggle{
+    width:auto; height:auto; flex-shrink:0; margin-left:-4px;
+    background:none; color:var(--pink); border:none;
+    font-family:var(--sans); font-size:11.5px; font-weight:600; line-height:1;
+    padding:2px 0 2px 4px;
+    transition:color .15s ease;
+  }
+  .help-toggle.open{ color:var(--pink-deep); text-decoration:underline; }
+
   .history-overlay{
     position:fixed; inset:0; background:rgba(74,55,66,.45); z-index:50;
     display:flex; align-items:flex-end; justify-content:center;
@@ -451,7 +460,7 @@
     <h2>
       <span class="num">1</span>상품 목록 입력<button id="quickPadToggleBtn" class="quickpad-ribbon-btn" type="button" aria-label="빠른 입력 패드 열기">
         <svg width="15" height="15" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 12L3 6v12l9-6z" fill="currentColor"/><path d="M12 12L21 6v12l-9-6z" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/></svg>
-      </button><button id="resetBtn" class="reset-btn" type="button">전체 초기화</button>
+      </button><button class="help-toggle" data-target="hintInput" type="button" aria-label="설명 보기">설명</button><button id="resetBtn" class="reset-btn" type="button">전체 초기화</button>
     </h2>
     <textarea id="productInput" class="product-textarea" placeholder="예) 1000,2000,4000/4,10000/2"></textarea>
 
@@ -482,7 +491,7 @@
       <p class="quickpad-hint">숫자 입력 후 “다음 상품”을 누르면 바로 위 입력칸에 반영돼요. 수량은 <b>/</b>, 쇼핑백·클리어런스 제외 표시는 <b>?</b> 버튼을 쓰면 됩니다.</p>
     </div>
 
-    <div class="hint">
+    <div class="hint" id="hintInput" style="display:none;">
       쉼표(,)로 상품을 구분하세요. 수량이 2개 이상이면 <code>합계금액/수량</code>으로 입력하면 됩니다.<br>
       예) <code>4000/4</code> → 1,000원짜리 상품 4개(합계 4,000원). 숫자 안에는 콤마를 넣지 마세요.<br>
       포스기에 찍힌 금액을 그대로 입력하세요 — 2+1처럼 무료로 찍힌 상품은 <code>0</code>으로 입력하면 됩니다.<br>
@@ -506,8 +515,8 @@
   </div>
 
   <div class="card" id="bundleCard" style="display:none;">
-    <h2><span class="num">+</span>1+1 / 2+1 묶음 설정 <span class="opt">(해당 시에만)</span></h2>
-    <p class="sub" style="margin-bottom:10px;">1+1·2+1처럼 세트로 묶어 파는 상품이면 위 목록에서 체크하고 묶음을 만드세요. 한 상품의 수량만으로 세트가 나오면 그 상품 하나만 체크해도 되고, 가격이 같은 여러 상품을 교차 선택해서 묶어도 됩니다 (포스기에 0원으로 찍힌 무료 상품이 섞여 있어도 괜찮아요). 묶인 세트는 분할결제 시 항상 같은 결제에 들어갑니다.</p>
+    <h2><span class="num">+</span>1+1 / 2+1 묶음 설정 <span class="opt">(해당 시에만)</span><button class="help-toggle" data-target="hintBundle" type="button" aria-label="설명 보기">설명</button></h2>
+    <p class="sub" id="hintBundle" style="display:none; margin-bottom:10px;">1+1·2+1처럼 세트로 묶어 파는 상품이면 위 목록에서 체크하고 묶음을 만드세요. 한 상품의 수량만으로 세트가 나오면 그 상품 하나만 체크해도 되고, 가격이 같은 여러 상품을 교차 선택해서 묶어도 됩니다 (포스기에 0원으로 찍힌 무료 상품이 섞여 있어도 괜찮아요). 묶인 세트는 분할결제 시 항상 같은 결제에 들어갑니다.</p>
     <div class="pillrow" id="bundleTypePills">
       <button class="pill active" data-size="2">1+1 (2개)</button>
       <button class="pill" data-size="3">2+1 (3개)</button>
@@ -546,8 +555,8 @@
   </div>
 
   <div class="card">
-    <h2><span class="num">4</span>사용 가능한 쿠폰 확인</h2>
-    <p class="sub" style="margin-bottom:10px;">고객이 이미 사용한 쿠폰이 있으면 체크를 해제하세요. 위 목록에 없는 쿠폰(직접 받은 쿠폰 등)은 아래에서 직접 추가할 수 있어요.</p>
+    <h2><span class="num">4</span>사용 가능한 쿠폰 확인<button class="help-toggle" data-target="hintCoupon" type="button" aria-label="설명 보기">설명</button></h2>
+    <p class="sub" id="hintCoupon" style="display:none; margin-bottom:10px;">고객이 이미 사용한 쿠폰이 있으면 체크를 해제하세요. 위 목록에 없는 쿠폰(직접 받은 쿠폰 등)은 아래에서 직접 추가할 수 있어요.</p>
     <div id="couponChecklist"></div>
 
     <div class="custom-coupon-form">
@@ -1254,6 +1263,18 @@
 
   renderCouponChecklist();
 
+  // ---------- collapsible step descriptions ----------
+  document.querySelectorAll('.help-toggle').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = document.getElementById(btn.dataset.target);
+      if(!target) return;
+      const willOpen = target.style.display === 'none';
+      target.style.display = willOpen ? 'block' : 'none';
+      btn.classList.toggle('open', willOpen);
+      btn.setAttribute('aria-label', willOpen ? '설명 숨기기' : '설명 보기');
+    });
+  });
+
   // ---------- history (localStorage) ----------
   const HISTORY_KEY = 'oy_coupon_history_v1';
   const HISTORY_MAX = 20;
@@ -1388,6 +1409,13 @@
     quickPadBuffer = '';
     document.getElementById('quickPad').style.display = 'none';
     document.getElementById('quickPadToggleBtn').classList.remove('active');
+
+    document.querySelectorAll('.help-toggle').forEach(btn=>{
+      const target = document.getElementById(btn.dataset.target);
+      if(target) target.style.display = 'none';
+      btn.classList.remove('open');
+      btn.setAttribute('aria-label', '설명 보기');
+    });
   });
 
   // ---------- quick numeric entry pad ----------
